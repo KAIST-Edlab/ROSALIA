@@ -41,38 +41,17 @@ from pycocotools import mask
 
 
 class REFER:
-    def __init__(self, data_root, dataset="refcoco", splitBy="unc"):
-        # provide data_root folder which contains refclef, refcoco, refcoco+ and refcocog
-        # also provide dataset name and splitBy information
-        # e.g., dataset = 'refcoco', splitBy = 'unc'
-        print("loading dataset %s into memory..." % dataset)
-        self.ROOT_DIR = osp.abspath(osp.dirname(__file__))
-        self.DATA_DIR = osp.join(data_root, dataset)
-        if dataset in ["refcoco", "refcoco+", "refcocog"]:
-            self.IMAGE_DIR = osp.join(data_root, "images/mscoco/images/train2014")
-        elif dataset == "refclef":
-            self.IMAGE_DIR = osp.join(data_root, "images/saiapr_tc-12")
-        else:
-            print("No refer dataset is called [%s]" % dataset)
-            sys.exit()
+    def __init__(self, data_root, json_file):
+        print("loading dataset into memory...")
+        self.IMAGE_DIR = osp.join(data_root, "mimic-cxr-dcm-png-histeq")
 
-        self.dataset = dataset
-
-        # load refs from data/dataset/refs(dataset).json
         tic = time.time()
 
-        ref_file = osp.join(self.DATA_DIR, "refs(" + splitBy + ").p")
-        print("ref_file: ", ref_file)
         self.data = {}
-        self.data["dataset"] = dataset
-        self.data["refs"] = pickle.load(open(ref_file, "rb"))
 
-        # load annotations from data/dataset/instances.json
-        instances_file = osp.join(self.DATA_DIR, "instances.json")
-        instances = json.load(open(instances_file, "rb"))
-        self.data["images"] = instances["images"]
-        self.data["annotations"] = instances["annotations"]
-        self.data["categories"] = instances["categories"]
+        # load annotations from json file 
+        instances_file = osp.join(self.DATA_DIR, json_file)
+        self.data = json.load(open(instances_file, "rb"))
 
         # create index
         self.createIndex()

@@ -17,6 +17,7 @@ from abc import ABC, abstractmethod
 
 import torch
 import torch.nn as nn
+import pdb
 
 # from llava.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_PATCH_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
 from utils.utils import (DEFAULT_IM_END_TOKEN, DEFAULT_IM_START_TOKEN,
@@ -32,7 +33,14 @@ class LlavaMetaModel:
 
         if hasattr(config, "mm_vision_tower"):
             self.vision_tower = build_vision_tower(config, delay_load=True)
-            self.mm_projector = nn.Linear(config.mm_hidden_size, config.hidden_size)
+            if 'llava' in config._name_or_path and '1.5'in config._name_or_path:
+                self.mm_projector = nn.Sequential(
+                    nn.Linear(config.mm_hidden_size, config.hidden_size),
+                    nn.GELU(),
+                    nn.Linear(config.hidden_size, config.hidden_size)
+                )
+            else:
+                self.mm_projector = nn.Linear(config.mm_hidden_size, config.hidden_size)
 
     def get_vision_tower(self):
         vision_tower = getattr(self, "vision_tower", None)
@@ -61,9 +69,14 @@ class LlavaMetaModel:
         self.config.mm_vision_select_feature = mm_vision_select_feature
 
         if not hasattr(self, "mm_projector"):
-            self.mm_projector = nn.Linear(
-                self.config.mm_hidden_size, self.config.hidden_size
-            )
+            if 'llava' in self.config._name_or_path and '1.5'in self.config._name_or_path:
+                self.mm_projector = nn.Sequential(
+                    nn.Linear(self.config.mm_hidden_size, self.config.hidden_size),
+                    nn.GELU(),
+                    nn.Linear(self.config.hidden_size, self.config.hidden_size)
+                )
+            else:
+                self.mm_projector = nn.Linear(self.config.mm_hidden_size, self.config.hidden_size)
 
         if pretrain_mm_mlp_adapter is not None:
             mm_projector_weights = torch.load(

@@ -11,6 +11,7 @@ from utils.utils import (DEFAULT_IM_END_TOKEN, DEFAULT_IM_START_TOKEN,
 from .llava.model.language_model.llava_llama import (LlavaLlamaForCausalLM,
                                                      LlavaLlamaModel)
 from .segment_anything import build_sam_vit_h
+import pdb
 
 
 def dice_loss(
@@ -131,11 +132,12 @@ class LISAForCausalLM(LlavaLlamaForCausalLM):
             config.mm_vision_tower = kwargs.get(
                 "vision_tower", "openai/clip-vit-large-patch14"
             )
-            self.ce_loss_weight = kwargs.pop("ce_loss_weight", None)
-            self.dice_loss_weight = kwargs.pop("dice_loss_weight", None)
-            self.bce_loss_weight = kwargs.pop("bce_loss_weight", None)
         else:
             config.mm_vision_tower = config.vision_tower
+
+        self.ce_loss_weight = kwargs.pop("ce_loss_weight", None)
+        self.dice_loss_weight = kwargs.pop("dice_loss_weight", None)
+        self.bce_loss_weight = kwargs.pop("bce_loss_weight", None)
             
         self.seg_token_idx = kwargs.pop("seg_token_idx")
 
@@ -268,26 +270,27 @@ class LISAForCausalLM(LlavaLlamaForCausalLM):
 
         multimask_output = False
         pred_masks = []
-        for i in range(len(pred_embeddings)):
-            (
-                sparse_embeddings,
-                dense_embeddings,
-            ) = self.model.visual_model.prompt_encoder(
-                points=None,
-                boxes=None,
-                masks=None,
-                text_embeds=pred_embeddings[i].unsqueeze(1),
-            )
-            sparse_embeddings = sparse_embeddings.to(pred_embeddings[i].dtype)
-            low_res_masks, iou_predictions = self.model.visual_model.mask_decoder(
-                image_embeddings=image_embeddings[i].unsqueeze(0),
-                image_pe=self.model.visual_model.prompt_encoder.get_dense_pe(),
-                sparse_prompt_embeddings=sparse_embeddings,
-                dense_prompt_embeddings=dense_embeddings,
-                multimask_output=multimask_output,
-            )
+        (
+            sparse_embeddings,
+            dense_embeddings,
+        ) = self.model.visual_model.prompt_encoder(
+            points=None,
+            boxes=None,
+            masks=None,
+            text_embeds=torch.cat(pred_embeddings, dim=0).unsqueeze(1),
+        )
+        sparse_embeddings = sparse_embeddings.to(pred_embeddings[i].dtype)
+        low_res_masks, iou_predictions = self.model.visual_model.mask_decoder(
+            image_embeddings=image_embeddings,
+            image_pe=torch.cat([self.model.visual_model.prompt_encoder.get_dense_pe()] * image_embeddings.shape[0], dim=0),
+            sparse_prompt_embeddings=sparse_embeddings,
+            dense_prompt_embeddings=dense_embeddings,
+            multimask_output=multimask_output,
+        )
+
+        for i in range(low_res_masks.shape[0]):
             pred_mask = self.model.visual_model.postprocess_masks(
-                low_res_masks,
+                low_res_masks[i:i+1],
                 input_size=resize_list[i],
                 original_size=label_list[i].shape,
             )
@@ -309,6 +312,7 @@ class LISAForCausalLM(LlavaLlamaForCausalLM):
         mask_bce_loss = 0
         mask_dice_loss = 0
         num_masks = 0
+        num_masks_dice = 0
         for batch_idx in range(len(pred_masks)):
             gt_mask = gt_masks[batch_idx]
             pred_mask = pred_masks[batch_idx]
@@ -322,14 +326,17 @@ class LISAForCausalLM(LlavaLlamaForCausalLM):
                 sigmoid_ce_loss(pred_mask, gt_mask, num_masks=gt_mask.shape[0])
                 * gt_mask.shape[0]
             )
-            mask_dice_loss += (
-                dice_loss(pred_mask, gt_mask, num_masks=gt_mask.shape[0])
-                * gt_mask.shape[0]
-            )
             num_masks += gt_mask.shape[0]
 
+            if gt_mask.sum().item() != 0: ## skip dice loss calculation for empty target cases
+                mask_dice_loss += (
+                    dice_loss(pred_mask, gt_mask, num_masks=gt_mask.shape[0])
+                    * gt_mask.shape[0]
+                )
+                num_masks_dice += gt_mask.shape[0]
+
         mask_bce_loss = self.bce_loss_weight * mask_bce_loss / (num_masks + 1e-8)
-        mask_dice_loss = self.dice_loss_weight * mask_dice_loss / (num_masks + 1e-8)
+        mask_dice_loss = self.dice_loss_weight * mask_dice_loss / (num_masks_dice + 1e-8)
         mask_loss = mask_bce_loss + mask_dice_loss
 
         loss = ce_loss + mask_loss
@@ -351,6 +358,7 @@ class LISAForCausalLM(LlavaLlamaForCausalLM):
         original_size_list,
         max_new_tokens=32,
         tokenizer=None,
+        **kwargs,
     ):
         with torch.no_grad():
             outputs = self.generate(

@@ -15,19 +15,27 @@ from torch.utils.tensorboard import SummaryWriter
 
 from model.LISA import LISAForCausalLM
 from model.llava import conversation as conversation_lib
-from utils.dataset import HybridDataset, ValDataset, collate_fn
-from utils.utils import (DEFAULT_IM_END_TOKEN, DEFAULT_IM_START_TOKEN,
+from model.llava.mm_utils import tokenizer_image_token
+from utils.reason_seg_dataset import ReasonSegDataset
+from utils.dataset import collate_fn
+# from utils.dataset import CXRSegDataset, ValDataset, collate_fn
+from utils.utils import (DEFAULT_IM_END_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IMAGE_TOKEN, IMAGE_TOKEN_INDEX,
                          AverageMeter, ProgressMeter, Summary, dict_to_cuda,
                          intersectionAndUnionGPU)
+import math
+from torchvision.utils import save_image, make_grid
+from torchvision.transforms.functional import to_pil_image
+import cv2
+import re 
+import pdb
 
 
 def parse_args(args):
     parser = argparse.ArgumentParser(description="LISA Model Training")
     parser.add_argument("--local_rank", default=0, type=int, help="node rank")
     parser.add_argument(
-        "--version", default="liuhaotian/llava-llama-2-13b-chat-lightning-preview"
-    )
-    parser.add_argument("--vis_save_path", default="./vis_output", type=str)
+        "--version", default="xinlai/LISA-7B-v1"
+    ) # xinlai/LISA-7B-v1, xinlai/LISA-13B-llama2-v1, "liuhaotian/llava-llama-2-13b-chat-lightning-preview"
     parser.add_argument(
         "--precision",
         default="bf16",
@@ -37,66 +45,57 @@ def parse_args(args):
     )
     parser.add_argument("--image_size", default=1024, type=int, help="image size")
     parser.add_argument("--model_max_length", default=512, type=int)
-    parser.add_argument("--lora_r", default=8, type=int)
     parser.add_argument(
         "--vision-tower", default="openai/clip-vit-large-patch14", type=str
     )
     parser.add_argument("--load_in_8bit", action="store_true", default=False)
     parser.add_argument("--load_in_4bit", action="store_true", default=False)
-
-    parser.add_argument(
-        "--dataset", default="sem_seg||refer_seg||vqa||reason_seg", type=str
-    )
-    parser.add_argument("--sample_rates", default="9,3,3,1", type=str)
-    parser.add_argument(
-        "--sem_seg_data",
-        default="ade20k||cocostuff||pascal_part||paco_lvis||mapillary",
-        type=str,
-    )
-    parser.add_argument(
-        "--refer_seg_data", default="refclef||refcoco||refcoco+||refcocog", type=str
-    )
-    parser.add_argument("--vqa_data", default="llava_instruct_150k", type=str)
-    parser.add_argument("--reason_seg_data", default="ReasonSeg|train", type=str)
-    parser.add_argument("--val_dataset", default="ReasonSeg|val", type=str)
-    parser.add_argument("--dataset_dir", default="./dataset", type=str)
-    parser.add_argument("--log_base_dir", default="./runs", type=str)
+    parser.add_argument("--dataset_dir", default="/home/work/data/hangyul", type=str) ## need to change
+    parser.add_argument("--json_dir", default="/home/work/data/hangyul/mimic_cxr_not_filtered_qa/mimic_cxr_merged.json", type=str) ## need to change
+    parser.add_argument("--cache_dir", default=None, type=str) ## need to change
+    parser.add_argument("--log_base_dir", default="/home/work/data/runs", type=str) ## need to change
     parser.add_argument("--exp_name", default="lisa", type=str)
-    parser.add_argument("--epochs", default=10, type=int)
+    parser.add_argument("--epochs", default=3, type=int)
     parser.add_argument("--steps_per_epoch", default=500, type=int)
     parser.add_argument(
-        "--batch_size", default=2, type=int, help="batch size per device per step"
+        "--batch_size", default=1, type=int, help="batch size per device per step"
     )
     parser.add_argument(
         "--grad_accumulation_steps",
-        default=10,
+        default=1,
         type=int,
     )
     parser.add_argument("--val_batch_size", default=1, type=int)
-    parser.add_argument("--workers", default=4, type=int)
+    parser.add_argument("--workers", default=16, type=int)
     parser.add_argument("--lr", default=0.0003, type=float)
-    parser.add_argument("--ce_loss_weight", default=1.0, type=float)
-    parser.add_argument("--dice_loss_weight", default=0.5, type=float)
-    parser.add_argument("--bce_loss_weight", default=2.0, type=float)
+    parser.add_argument("--ce_loss_weight", default=0.5, type=float)
+    parser.add_argument("--dice_loss_weight", default=1.0, type=float)
+    parser.add_argument("--bce_loss_weight", default=5.0, type=float)
+    parser.add_argument("--lora_r", default=8, type=int)
     parser.add_argument("--lora_alpha", default=16, type=int)
     parser.add_argument("--lora_dropout", default=0.05, type=float)
     parser.add_argument("--lora_target_modules", default="q_proj,v_proj", type=str)
+    parser.add_argument("--lora_sam_encoder", action="store_true", default=False, help='whether to lora finetuning sam image encoder or not')
     parser.add_argument("--explanatory", default=0.1, type=float)
     parser.add_argument("--beta1", default=0.9, type=float)
     parser.add_argument("--beta2", default=0.95, type=float)
     parser.add_argument("--num_classes_per_sample", default=3, type=int)
     parser.add_argument("--exclude_val", action="store_true", default=False)
     parser.add_argument("--no_eval", action="store_true", default=False)
-    parser.add_argument("--eval_only", action="store_true", default=False)
-    parser.add_argument("--vision_pretrained", default="PATH_TO_SAM_ViT-H", type=str)
+    parser.add_argument("--test", action="store_true", default=False)
+    parser.add_argument("--vision_pretrained", default="/home/work/data/sam_vit_h_4b8939.pth", type=str) ### need to change
     parser.add_argument("--out_dim", default=256, type=int)
-    parser.add_argument("--resume", default="", type=str)
+    parser.add_argument("--resume", default=None, type=str)
     parser.add_argument("--print_freq", default=1, type=int)
     parser.add_argument("--start_epoch", default=0, type=int)
     parser.add_argument("--gradient_checkpointing", action="store_true", default=True)
     parser.add_argument("--train_mask_decoder", action="store_true", default=True)
     parser.add_argument("--use_mm_start_end", action="store_true", default=True)
     parser.add_argument("--auto_resume", action="store_true", default=True)
+    parser.add_argument("--vis_output", action="store_true", default=False)
+    parser.add_argument("--debug", action="store_true", default=False)
+    parser.add_argument("--batch_balance", action="store_true", default=False, help="Enable 1:1 pos/neg sampling for train only")
+    parser.add_argument("--measure_text", action="store_true", default=False, help="Whether to measure text response")
     parser.add_argument(
         "--conv_type",
         default="llava_v1",
@@ -118,7 +117,7 @@ def main(args):
     # Create model
     tokenizer = transformers.AutoTokenizer.from_pretrained(
         args.version,
-        cache_dir=None,
+        cache_dir=args.cache_dir,
         model_max_length=args.model_max_length,
         padding_side="right",
         use_fast=False,
@@ -149,7 +148,7 @@ def main(args):
     elif args.precision == "fp16":
         torch_dtype = torch.half
     model = LISAForCausalLM.from_pretrained(
-        args.version, torch_dtype=torch_dtype, low_cpu_mem_usage=True, **model_args
+        args.version, torch_dtype=torch_dtype, low_cpu_mem_usage=False, cache_dir=args.cache_dir, **model_args
     )
     model.config.eos_token_id = tokenizer.eos_token_id
     model.config.bos_token_id = tokenizer.bos_token_id
@@ -161,7 +160,7 @@ def main(args):
     model.get_model().initialize_vision_modules(model.get_model().config)
     vision_tower = model.get_model().get_vision_tower()
     vision_tower.to(dtype=torch_dtype, device=args.local_rank)
-    if not args.eval_only:
+    if not args.test:
         model.get_model().initialize_lisa_modules(model.get_model().config)
 
     for p in vision_tower.parameters():
@@ -174,6 +173,10 @@ def main(args):
     ]
 
     lora_r = args.lora_r
+    if args.lora_sam_encoder: 
+        sam_img_encoder = model.get_model().visual_model.image_encoder
+        for param in sam_img_encoder.parameters(): param.requires_grad = True
+        
     if lora_r > 0:
 
         def find_linear_layers(model, lora_target_modules):
@@ -193,9 +196,14 @@ def main(args):
                             ]
                         ]
                     )
-                    and any([x in name for x in lora_target_modules])
+                    # and any([x in name for x in lora_target_modules])
                 ):
                     lora_module_names.add(name)
+
+                if args.lora_sam_encoder:
+                    if isinstance(module, cls) and "visual_model.image_encoder" in name:
+                        lora_module_names.add(name)
+
             return sorted(list(lora_module_names))
 
         lora_alpha = args.lora_alpha
@@ -224,46 +232,42 @@ def main(args):
                 for x in ["lm_head", "embed_tokens", "mask_decoder", "text_hidden_fcs"]
             ]
         ):
-            print("n: ", n, "p.shape: ", p.shape)
+            # print("n: ", n, "p.shape: ", p.shape)
             p.requires_grad = True
 
     world_size = torch.cuda.device_count()
     args.distributed = world_size > 1
-    train_dataset = HybridDataset(
-        args.dataset_dir,
-        tokenizer,
-        args.vision_tower,
-        samples_per_epoch=args.batch_size
-        * args.grad_accumulation_steps
-        * args.steps_per_epoch
-        * world_size,
-        precision=args.precision,
-        image_size=args.image_size,
-        num_classes_per_sample=args.num_classes_per_sample,
-        exclude_val=args.exclude_val,
-        dataset=args.dataset,
-        sample_rate=[float(x) for x in args.sample_rates.split(",")],
-        sem_seg_data=args.sem_seg_data,
-        refer_seg_data=args.refer_seg_data,
-        vqa_data=args.vqa_data,
-        reason_seg_data=args.reason_seg_data,
-        explanatory=args.explanatory,
+    train_dataset = ReasonSegDataset(
+        args=args,
+        json_dir = args.json_dir, 
+        base_image_dir= args.dataset_dir,
+        tokenizer= tokenizer,
+        vision_tower= args.vision_tower,
+        precision= args.precision,
+        split="train"
     )
 
     if args.no_eval == False:
-        val_dataset = ValDataset(
-            args.dataset_dir,
-            tokenizer,
-            args.vision_tower,
-            args.val_dataset,
-            args.image_size,
+        val_dataset = ReasonSegDataset(
+            args=args,
+            json_dir = args.json_dir, 
+            base_image_dir= args.dataset_dir,
+            tokenizer= tokenizer,
+            vision_tower= args.vision_tower,
+            precision= args.precision,
+            split="val" if args.test is False else "test"
         )
-        print(
-            f"Training with {len(train_dataset)} examples and validating with {len(val_dataset)} examples."
-        )
+        if args.local_rank == 0: print(f"Training with {len(train_dataset)} examples and validating with {len(val_dataset)} examples.")
+
     else:
         val_dataset = None
-        print(f"Training with {len(train_dataset)} examples.")
+        if args.local_rank == 0: print(f"Training with {len(train_dataset)} examples.")
+
+    N = len(train_dataset)  # <-- works because you pass `training_data=train_dataset`
+    global_effective_batch = args.batch_size * args.grad_accumulation_steps * world_size
+
+    steps_per_epoch = math.ceil(N / global_effective_batch)
+    if args.local_rank == 0 and args.test is False: print(f"Steps per epoch: {steps_per_epoch}")
 
     ds_config = {
         "train_micro_batch_size_per_gpu": args.batch_size,
@@ -279,7 +283,7 @@ def main(args):
         "scheduler": {
             "type": "WarmupDecayLR",
             "params": {
-                "total_num_steps": args.epochs * args.steps_per_epoch,
+                "total_num_steps": args.epochs * steps_per_epoch,
                 "warmup_min_lr": 0,
                 "warmup_max_lr": args.lr,
                 "warmup_num_steps": 100,
@@ -317,7 +321,7 @@ def main(args):
     )
 
     # resume deepspeed checkpoint
-    if args.auto_resume and len(args.resume) == 0:
+    if args.auto_resume and args.test is False:
         resume = os.path.join(args.log_dir, "ckpt_model")
         if os.path.exists(resume):
             args.resume = resume
@@ -327,7 +331,7 @@ def main(args):
         with open(os.path.join(args.resume, "latest"), "r") as f:
             ckpt_dir = f.readlines()[0].strip()
         args.start_epoch = (
-            int(ckpt_dir.replace("global_step", "")) // args.steps_per_epoch
+            int(ckpt_dir.replace("global_step", "")) // steps_per_epoch
         )
         print(
             "resume training from {}, start from epoch {}".format(
@@ -357,15 +361,18 @@ def main(args):
             ),
         )
 
-    train_iter = iter(train_loader)
+    # train_iter = iter(train_loader)
     best_score, cur_ciou = 0.0, 0.0
 
-    if args.eval_only:
-        giou, ciou = validate(val_loader, model_engine, 0, writer, args)
+    if args.test:
+        giou, ciou = validate(val_loader, model_engine, 0, writer, args, tokenizer=tokenizer)
         exit()
 
     for epoch in range(args.start_epoch, args.epochs):
         # train for one epoch
+        if hasattr(train_loader, "sampler") and hasattr(train_loader.sampler, "set_epoch"):
+            train_loader.sampler.set_epoch(epoch)
+        train_iter = iter(train_loader)
         train_iter = train(
             train_loader,
             model_engine,
@@ -398,6 +405,21 @@ def main(args):
                     shutil.rmtree(save_dir)
             torch.distributed.barrier()
             model_engine.save_checkpoint(save_dir)
+        
+        if epoch == args.epochs -1: 
+            save_dir = os.path.join(args.log_dir, "ckpt_model_last")
+            if args.local_rank == 0:
+                torch.save(
+                    {"epoch": epoch},
+                    os.path.join(
+                        args.log_dir,
+                        "meta_log_giou{:.3f}_ciou{:.3f}.pth".format(
+                            best_score, cur_ciou
+                        ),
+                    ),
+                )
+            torch.distributed.barrier()
+            model_engine.save_checkpoint(save_dir)
 
 
 def train(
@@ -417,9 +439,10 @@ def train(
     mask_bce_losses = AverageMeter("MaskBCELoss", ":.4f")
     mask_dice_losses = AverageMeter("MaskDICELoss", ":.4f")
     mask_losses = AverageMeter("MaskLoss", ":.4f")
+    steps_per_epoch = math.ceil(len(train_loader) / args.grad_accumulation_steps)
 
     progress = ProgressMeter(
-        args.steps_per_epoch,
+        steps_per_epoch,
         [
             batch_time,
             losses,
@@ -434,7 +457,7 @@ def train(
     # switch to train mode
     model.train()
     end = time.time()
-    for global_step in range(args.steps_per_epoch):
+    for global_step in range(steps_per_epoch):
         for i in range(args.grad_accumulation_steps):
             try:
                 input_dict = next(train_iter)
@@ -520,16 +543,41 @@ def train(
     return train_iter
 
 
-def validate(val_loader, model_engine, epoch, writer, args):
+def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
     intersection_meter = AverageMeter("Intersec", ":6.3f", Summary.SUM)
     union_meter = AverageMeter("Union", ":6.3f", Summary.SUM)
     acc_iou_meter = AverageMeter("gIoU", ":6.3f", Summary.SUM)
 
+    intersection_meter_pos = AverageMeter("Intersec", ":6.3f", Summary.SUM)
+    union_meter_pos = AverageMeter("Union", ":6.3f", Summary.SUM)
+    acc_iou_meter_pos = AverageMeter("gIoU", ":6.3f", Summary.SUM)
+
+    intersection_meter_neg = AverageMeter("Intersec", ":6.3f", Summary.SUM)
+    union_meter_neg = AverageMeter("Union", ":6.3f", Summary.SUM)
+    acc_iou_meter_neg = AverageMeter("gIoU", ":6.3f", Summary.SUM)
+
+
     model_engine.eval()
+    disease_list = ['cardiomegaly', 'consolidation', 'atelectasis', 'edema', 'effusion', 'opacity', 'pneumonia', 'congestion']
+    question_type_list = ['basic', 'global', 'lesion inference']
+    metric_list = ['intersection', 'union', 'iou']
+    disease_meter_dict = {}
+    question_meter_dict = {}
+    non_empty_counter = {}
+    for disease in disease_list: 
+        disease_meter_dict[disease] = {'pos':{}, 'neg': {}}
+        non_empty_counter[disease] = AverageMeter(f"{disease.title()}_non_empty_counter", ":6.3f", Summary.SUM)
+        for metric in metric_list: 
+            disease_meter_dict[disease]['pos'][metric] = AverageMeter(f"{disease.title()}_pos_{metric}", ":6.3f", Summary.SUM)
+            disease_meter_dict[disease]['neg'][metric] = AverageMeter(f"{disease.title()}_neg_{metric}", ":6.3f", Summary.SUM)
+
+    for question_type in question_type_list:
+        question_meter_dict[question_type] = {'pos':AverageMeter(f"{question_type.title()}_pos", ":6.3f", Summary.SUM), 'neg': AverageMeter(f"{question_type.title()}_neg", ":6.3f", Summary.SUM)}
 
     for input_dict in tqdm.tqdm(val_loader):
         torch.cuda.empty_cache()
 
+        disease_category = input_dict['disease'][0]
         input_dict = dict_to_cuda(input_dict)
         if args.precision == "fp16":
             input_dict["images"] = input_dict["images"].half()
@@ -542,12 +590,90 @@ def validate(val_loader, model_engine, epoch, writer, args):
             input_dict["images_clip"] = input_dict["images_clip"].float()
 
         with torch.no_grad():
-            output_dict = model_engine(**input_dict)
+            if args.measure_text: 
+                input_dict["tokenizer"] = tokenizer
 
+                conv = conversation_lib.conv_templates[args.conv_type].copy()
+                conv.messages = []
+
+                prompt = input_dict['questions_list'][0][0]
+                if args.use_mm_start_end:
+                    replace_token = (
+                        DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN
+                    )
+                    prompt = prompt.replace(DEFAULT_IMAGE_TOKEN, replace_token)
+
+                conv.append_message(conv.roles[0], prompt)
+                conv.append_message(conv.roles[1], "")
+                prompt = conv.get_prompt()
+                input_ids = tokenizer_image_token(prompt, tokenizer, return_tensors="pt")
+                input_ids = input_ids.unsqueeze(0).cuda()
+                input_dict["input_ids"] = input_ids
+
+                image_np = cv2.imread(input_dict['image_paths'][0])
+                image_np = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
+                original_size_list = [image_np.shape[:2]]
+                input_dict["original_size_list"] = original_size_list
+        
+                output_ids, pred_masks = model_engine.module.model.evaluate(max_new_tokens=512, **input_dict)
+                output_ids = output_ids[0][output_ids[0] != IMAGE_TOKEN_INDEX]
+                text_output = tokenizer.decode(output_ids, skip_special_tokens=False)
+                text_output = text_output.replace("\n", "").replace("  ", " ")
+                output_dict = {"pred_masks": pred_masks, "gt_masks":input_dict['masks_list'], "text_output":text_output}
+            else:
+                output_dict = model_engine(**input_dict)
+
+        if "text_output" in output_dict.keys():
+            gt_answer = input_dict["conversation_list"][0].split("ASSISTANT:")[-1].split("</s>")[0].strip()
+            pred_answer = output_dict["text_output"].split("ASSISTANT:")[-1].split("</s>")[0].strip()
+            gt_text_dict = parse_answer(input_dict['questions_list'][0][0], gt_answer)
+            pred_text_dict = parse_answer(input_dict['questions_list'][0][0], pred_answer)
+            text_correct = (gt_text_dict==pred_text_dict)
+            if gt_text_dict['presence_label'] == 'no':
+                question_meter_dict[gt_text_dict['type']]['neg'].update(int(text_correct))
+            else:
+                question_meter_dict[gt_text_dict['type']]['pos'].update(int(text_correct))
+
+            # {"type":question_type, "target":target, "location":location, "presence_label":presence_label}
+
+            # print(f'gt tuple: {gt_tuple} / pred tuple: {pred_tuple}')
+        ## output_dict["pred_masks"] - list, element shape [1, 1024, 1024], logits 
+        ## output_dict["gt_masks"] - list, element shape [1, 1024, 1024], one-hot gt mask  
         pred_masks = output_dict["pred_masks"]
         masks_list = output_dict["gt_masks"][0].int()
         output_list = (pred_masks[0] > 0).int()
         assert len(pred_masks) == 1
+
+        pixel_mean, pixel_std = val_loader.dataset.pixel_mean.to(input_dict["images"].device), val_loader.dataset.pixel_std.to(input_dict["images"].device)
+        image_original = input_dict["images"] * pixel_std[None, ...] + pixel_mean[None, ...]
+        image_original = image_original.clamp(0,255) / 255
+
+        if args.vis_output:
+            image_name = input_dict["image_paths"][0].split('/')[-1]
+            def overlay_mask(image, mask, alpha=0.5):
+                color_mask = torch.zeros_like(image)
+                color_mask[:, 2] = 1
+                if mask.dim() == 2:
+                    mask = mask.unsqueeze(0)
+                if mask.size(0) == 1:
+                    mask = mask.repeat(3, 1, 1)
+
+                overlay = torch.where(mask[None, ...].bool(), (1 - alpha) * image + alpha * color_mask, image)
+                return overlay
+
+            grid = make_grid(torch.cat([overlay_mask(image_original, masks_list[0].float()), overlay_mask(image_original, output_list[0].float())], dim=0), nrow=2) 
+            img = to_pil_image(grid)
+
+            if masks_list[0].sum() != 0: 
+                os.makedirs(f'pos_example/{disease_category}', exist_ok=True)
+                img.save(f'pos_example/{disease_category}/{image_name}')
+            else: 
+                if masks_list[0].sum() == 0 and output_list[0].sum() != 0: 
+                    os.makedirs(f'neg_example/empty_wrong/{disease_category}', exist_ok=True)
+                    img.save(f'neg_example/empty_wrong/{disease_category}/{image_name}')
+                else:
+                    os.makedirs(f'neg_example/{disease_category}', exist_ok=True)
+                    img.save(f'neg_example/{disease_category}/{image_name}')
 
         intersection, union, acc_iou = 0.0, 0.0, 0.0
         for mask_i, output_i in zip(masks_list, output_list):
@@ -564,20 +690,133 @@ def validate(val_loader, model_engine, epoch, writer, args):
             union
         ), acc_iou_meter.update(acc_iou, n=masks_list.shape[0])
 
+        if masks_list[0].sum() != 0:
+            intersection_meter_pos.update(intersection), union_meter_pos.update(union), acc_iou_meter_pos.update(acc_iou, n=masks_list.shape[0])
+            disease_meter_dict[disease_category]['pos']['intersection'].update(intersection)
+            disease_meter_dict[disease_category]['pos']['union'].update(union)
+            disease_meter_dict[disease_category]['pos']['iou'].update(acc_iou, n=masks_list.shape[0])
+
+            if output_list[0].sum() != 0: 
+                non_empty_counter[disease_category].update(masks_list.shape[0], n=masks_list.shape[0])
+        else:
+            intersection_meter_neg.update(intersection), union_meter_neg.update(union), acc_iou_meter_neg.update(acc_iou, n=masks_list.shape[0])
+            disease_meter_dict[disease_category]['neg']['intersection'].update(intersection)
+            disease_meter_dict[disease_category]['neg']['union'].update(union)
+            disease_meter_dict[disease_category]['neg']['iou'].update(acc_iou, n=masks_list.shape[0])
+
     intersection_meter.all_reduce()
     union_meter.all_reduce()
     acc_iou_meter.all_reduce()
+    intersection_meter_pos.all_reduce()
+    union_meter_pos.all_reduce()
+    acc_iou_meter_pos.all_reduce()
+    intersection_meter_neg.all_reduce()
+    union_meter_neg.all_reduce()
+    acc_iou_meter_neg.all_reduce()
+
+    for disease in disease_list: 
+        for v_dict in disease_meter_dict[disease]['pos'].values(): v_dict.all_reduce()
+        for v_dict in disease_meter_dict[disease]['neg'].values(): v_dict.all_reduce()
+        non_empty_counter[disease].all_reduce()
+    if args.measure_text: 
+        for question_type in question_type_list: 
+            question_meter_dict[question_type]['pos'].all_reduce()
+            question_meter_dict[question_type]['neg'].all_reduce()
 
     iou_class = intersection_meter.sum / (union_meter.sum + 1e-10)
     ciou = iou_class[1]
     giou = acc_iou_meter.avg[1]
+
+    iou_class_pos = intersection_meter_pos.sum / (union_meter_pos.sum + 1e-10)
+    ciou_pos = iou_class_pos[1]
+    giou_pos = acc_iou_meter_pos.avg[1]
+    giou_neg = acc_iou_meter_neg.avg[1]
 
     if args.local_rank == 0:
         writer.add_scalar("val/giou", giou, epoch)
         writer.add_scalar("val/ciou", ciou, epoch)
         print("giou: {:.4f}, ciou: {:.4f}".format(giou, ciou))
 
-    return giou, ciou
+        writer.add_scalar("val/giou_pos", giou_pos, epoch)
+        writer.add_scalar("val/ciou_pos", ciou_pos, epoch)
+        writer.add_scalar("val/giou_neg", giou_neg, epoch)
+        print("Pos sample (n={}) - giou_pos: {:.4f}, ciou_pos: {:.4f} / Neg sample (n={}) - giou_neg: {:.4f}, ciou_neg: None".format(int(intersection_meter_pos.count), giou_pos, ciou_pos, int(intersection_meter_neg.count), giou_neg))
+
+        for disease in disease_list: 
+            iou_disease_pos = disease_meter_dict[disease]['pos']['intersection'].sum / (disease_meter_dict[disease]['pos']['union'].sum + 1e-10)
+            ciou_disease = iou_disease_pos[1]
+            giou_disease_pos = disease_meter_dict[disease]['pos']['iou'].avg[1]
+            giou_disease_neg = disease_meter_dict[disease]['neg']['iou'].avg[1]
+
+            pos_disease_count = int(disease_meter_dict[disease]['pos']['intersection'].count)
+            neg_disease_count = int(disease_meter_dict[disease]['neg']['intersection'].count)
+            non_empty_count = int(non_empty_counter[disease].count)
+
+            print(f"{disease.title()} (n={pos_disease_count}) - giou_pos: {giou_disease_pos:.4f}, ciou_pos: {ciou_disease:.4f}, false_empty_ratio: {(pos_disease_count-non_empty_count)/(pos_disease_count):.4f} ({pos_disease_count-non_empty_count}/{pos_disease_count}) / No {disease.title()} (n={neg_disease_count}) - giou_neg: {giou_disease_neg:.4f}, ciou_neg: None")
+
+        if args.measure_text: 
+            total_count, total_correct_count = 0, 0
+            print('<Text accuracy>')
+            for question_type in question_type_list:
+                question_pos_count, question_neg_count = int(question_meter_dict[question_type]['pos'].count), int(question_meter_dict[question_type]['neg'].count)
+                type_correct_count = int(question_meter_dict[question_type]['pos'].sum) + int(question_meter_dict[question_type]['neg'].sum)
+                total_count += (question_pos_count+question_neg_count)
+                total_correct_count += type_correct_count
+                question_pos_acc = question_meter_dict[question_type]['pos'].avg
+                question_neg_acc = question_meter_dict[question_type]['neg'].avg
+                print(f'{question_type.title()} - Total (n={question_pos_count+question_neg_count}): {type_correct_count/(question_pos_count+question_neg_count):.4f} / Pos (n={question_pos_count}): {question_pos_acc:.4f} / Neg (n={question_neg_count}): {question_neg_acc:.4f}')
+
+            print(f'Total(n={total_count}): {total_correct_count/total_count:.4f}')
+
+
+    return giou_pos, ciou_pos
+
+
+def parse_answer(question: str, answer: str):
+    question_text = question.lower().strip()
+    if re.search(r"predict its type|opacity", question_text):
+        question_type = "lesion inference"
+    elif "segment" in question_text and "in the" in question_text:
+        question_type = "basic"
+    elif "segment" in question_text:
+        question_type = "global"
+    else:
+        question_type = "unknown"
+
+    text = answer.strip()
+    lower = text.lower()
+
+    # --- Lesion Inference ---
+    if question_type == "lesion inference":
+        m = re.search(r"(?:highly suggestive of|possibly reflects)\s+(.+?)[\.\n]*$", lower)
+        target, location = (m.group(1), 'not extracted') if m else ('not extracted', 'not extracted')
+        presence_label = 'definite' if 'highly suggestive of' in lower else 'tentative'
+
+    # --- Basic ---
+    elif question_type == "basic":
+        m = re.search(r"there is no\s+(.+?)\s+in the\s+(.+?)[\.\n]*$", lower)
+        target, location, presence_label = (m.group(1), m.group(2), 'no') if m else ('not extracted', 'not extracted', 'yes')
+
+    # --- Global ---
+    elif question_type == "global":
+        if re.search(r"it is located in the .+", lower):
+            m = re.search(r"it is located in the\s+(.+?)[\.\n]*$", lower)
+            target = 'not extracted'
+            location = m.group(1) if m else 'not extracted'
+            presence_label = 'yes'
+
+        elif re.search(r"there is no .+", lower):
+            m = re.search(r"there is no\s+(.+?)[\.\n]*$", lower)
+            target = m.group(1) if m else 'not extracted'
+            location = 'none'
+            presence_label = 'no'
+        else: 
+            target, location, presence_label = 'not extracted', 'not extracted', 'not extracted'
+
+    else: 
+        target, location, presence_label = 'not extracted', 'not extracted', 'not extracted'
+
+    return {"type":question_type, "target":target, "location":location, "presence_label":presence_label}
 
 
 if __name__ == "__main__":

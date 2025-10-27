@@ -12,7 +12,6 @@ from torch.nn import functional as F
 
 from .common import LayerNorm2d
 
-
 class MaskDecoder(nn.Module):
     def __init__(
         self,
@@ -134,9 +133,9 @@ class MaskDecoder(nn.Module):
         # image_embeddings: [1, C, H, W], tokens: [B, N, C]
         # dense_prompt_embeddings: [B, C, H, W]
         # Expand per-image data in batch direction to be per-mask
-        src = torch.repeat_interleave(image_embeddings, tokens.shape[0], dim=0)
+        src = torch.repeat_interleave(image_embeddings, tokens.shape[0], dim=0) if image_embeddings.shape[0] != tokens.shape[0] else image_embeddings
         src = src + dense_prompt_embeddings
-        pos_src = torch.repeat_interleave(image_pe, tokens.shape[0], dim=0)
+        pos_src = torch.repeat_interleave(image_pe, tokens.shape[0], dim=0) if image_embeddings.shape[0] != tokens.shape[0] else image_pe
         b, c, h, w = src.shape
 
         # Run the transformer

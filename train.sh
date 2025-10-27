@@ -1,0 +1,12 @@
+deepspeed --master_port=24999 train_ds.py \
+--epoch 10 \
+--log_base_dir /home/work/data/runs \
+--cache_dir /home/work/data \
+--json_dir /home/work/data/hangyul/mimic_cxr_not_filtered_refined/mimic_cxr_merged.json \
+--batch_size 128 \
+--exp_name lisa_7b_sam_finetune \
+--batch_balance \
+--grad_accumulation_steps 1 \
+--lora_r 128 \
+--lora_alpha 256 \
+--lora_sam_encoder

@@ -11,9 +11,9 @@ from transformers import CLIPImageProcessor
 from model.llava import conversation as conversation_lib
 from model.segment_anything.utils.transforms import ResizeLongestSide
 
-from .grefer import G_REFER
+# from .grefer import G_REFER
 from .refer import REFER
-from .utils import ANSWER_LIST, SHORT_QUESTION_LIST
+# from .utils import ANSWER_LIST, SHORT_QUESTION_LIST
 
 
 class ReferSegDataset(torch.utils.data.Dataset):
@@ -32,7 +32,6 @@ class ReferSegDataset(torch.utils.data.Dataset):
         image_size: int = 224,
         num_classes_per_sample: int = 3,
         exclude_val=False,
-        refer_seg_data="refclef||refcoco||refcoco+||refcocog",
     ):
         self.exclude_val = exclude_val
         self.samples_per_epoch = samples_per_epoch
@@ -45,62 +44,51 @@ class ReferSegDataset(torch.utils.data.Dataset):
         self.transform = ResizeLongestSide(image_size)
         self.clip_image_processor = CLIPImageProcessor.from_pretrained(vision_tower)
 
-        self.short_question_list = SHORT_QUESTION_LIST
-        self.answer_list = ANSWER_LIST
+        # self.short_question_list = SHORT_QUESTION_LIST
+        # self.answer_list = ANSWER_LIST
 
-        DATA_DIR = os.path.join(base_image_dir, "refer_seg")
-        self.refer_seg_ds_list = refer_seg_data.split(
-            "||"
-        )  # ['refclef', 'refcoco', 'refcoco+', 'refcocog']
+        DATA_DIR = base_image_dir
         self.refer_seg_data = {}
-        for ds in self.refer_seg_ds_list:
-            if ds == "refcocog":
-                splitBy = "umd"
-            else:
-                splitBy = "unc"
 
-            if ds == "grefcoco":
-                refer_api = G_REFER(DATA_DIR, ds, splitBy)
-            else:
-                refer_api = REFER(DATA_DIR, ds, splitBy)
-            ref_ids_train = refer_api.getRefIds(split="train")
-            images_ids_train = refer_api.getImgIds(ref_ids=ref_ids_train)
-            refs_train = refer_api.loadRefs(ref_ids=ref_ids_train)
+        refer_api = REFER(DATA_DIR)
+        ref_ids_train = refer_api.getRefIds(split="train")
+        images_ids_train = refer_api.getImgIds(ref_ids=ref_ids_train)
+        refs_train = refer_api.loadRefs(ref_ids=ref_ids_train)
 
-            refer_seg_ds = {}
-            refer_seg_ds["images"] = []
-            loaded_images = refer_api.loadImgs(image_ids=images_ids_train)
+        refer_seg_ds = {}
+        refer_seg_ds["images"] = []
+        loaded_images = refer_api.loadImgs(image_ids=images_ids_train)
 
-            for item in loaded_images:
-                item = item.copy()
-                if ds == "refclef":
-                    item["file_name"] = os.path.join(
-                        DATA_DIR, "images/saiapr_tc-12", item["file_name"]
-                    )
-                else:
-                    item["file_name"] = os.path.join(
-                        DATA_DIR, "images/mscoco/images/train2014", item["file_name"]
-                    )
-                refer_seg_ds["images"].append(item)
-            refer_seg_ds["annotations"] = refer_api.Anns  # anns_train
-
-            print(
-                "dataset {} (refs {}) (train split) has {} images and {} annotations.".format(
-                    ds,
-                    splitBy,
-                    len(refer_seg_ds["images"]),
-                    len(refer_seg_ds["annotations"]),
+        for item in loaded_images:
+            item = item.copy()
+            if ds == "refclef":
+                item["file_name"] = os.path.join(
+                    DATA_DIR, "images/saiapr_tc-12", item["file_name"]
                 )
-            )
+            else:
+                item["file_name"] = os.path.join(
+                    DATA_DIR, "images/mscoco/images/train2014", item["file_name"]
+                )
+            refer_seg_ds["images"].append(item)
+        refer_seg_ds["annotations"] = refer_api.Anns  # anns_train
 
-            img2refs = {}
-            for ref in refs_train:
-                image_id = ref["image_id"]
-                img2refs[image_id] = img2refs.get(image_id, []) + [
-                    ref,
-                ]
-            refer_seg_ds["img2refs"] = img2refs
-            self.refer_seg_data[ds] = refer_seg_ds
+        print(
+            "dataset {} (refs {}) (train split) has {} images and {} annotations.".format(
+                ds,
+                splitBy,
+                len(refer_seg_ds["images"]),
+                len(refer_seg_ds["annotations"]),
+            )
+        )
+
+        img2refs = {}
+        for ref in refs_train:
+            image_id = ref["image_id"]
+            img2refs[image_id] = img2refs.get(image_id, []) + [
+                ref,
+            ]
+        refer_seg_ds["img2refs"] = img2refs
+        self.refer_seg_data[ds] = refer_seg_ds
 
     def __len__(self):
         return self.samples_per_epoch

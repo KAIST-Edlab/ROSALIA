@@ -20,7 +20,7 @@ def parse_args(args):
         description="merge lora weights and save model with hf format"
     )
     parser.add_argument(
-        "--version", default="liuhaotian/llava-llama-2-13b-chat-lightning-preview"
+        "--version", default="xinlai/LISA-7B-v1"
     )
     parser.add_argument("--vis_save_path", default="./vis_output", type=str)
     parser.add_argument(
@@ -41,6 +41,7 @@ def parse_args(args):
     parser.add_argument("--lora_alpha", default=16, type=int)
     parser.add_argument("--lora_dropout", default=0.05, type=float)
     parser.add_argument("--lora_target_modules", default="q_proj,v_proj", type=str)
+    parser.add_argument("--lora_sam_encoder", action="store_true", default=False, help='whether to lora finetuning sam image encoder or not')
     parser.add_argument("--local-rank", default=0, type=int, help="node rank")
     parser.add_argument("--train_mask_decoder", action="store_true", default=True)
     parser.add_argument("--use_mm_start_end", action="store_true", default=True)
@@ -50,6 +51,7 @@ def parse_args(args):
         type=str,
         choices=["llava_v1", "llava_llama_2"],
     )
+    parser.add_argument("--cache_dir", default=None, type=str) ## need to change
     parser.add_argument("--weight", default="", type=str, required=True)
     parser.add_argument("--save_path", default="./lisa_model", type=str, required=True)
     return parser.parse_args(args)
@@ -62,7 +64,7 @@ def main(args):
     # Create model
     tokenizer = transformers.AutoTokenizer.from_pretrained(
         args.version,
-        cache_dir=None,
+        cache_dir=args.cache_dir,
         model_max_length=args.model_max_length,
         padding_side="right",
         use_fast=False,
@@ -89,7 +91,7 @@ def main(args):
     elif args.precision == "fp16":
         torch_dtype = torch.half
     model = LISAForCausalLM.from_pretrained(
-        args.version, torch_dtype=torch_dtype, low_cpu_mem_usage=True, **model_args
+        args.version, torch_dtype=torch_dtype, low_cpu_mem_usage=False, cache_dir=args.cache_dir, **model_args
     )
     model.config.eos_token_id = tokenizer.eos_token_id
     model.config.bos_token_id = tokenizer.bos_token_id
@@ -101,6 +103,10 @@ def main(args):
     model.get_model().initialize_lisa_modules(model.get_model().config)
 
     lora_r = args.lora_r
+    if args.lora_sam_encoder: 
+        sam_img_encoder = model.get_model().visual_model.image_encoder
+        for param in sam_img_encoder.parameters(): param.requires_grad = True
+
     if lora_r > 0:
 
         def find_linear_layers(model, lora_target_modules):
@@ -120,9 +126,14 @@ def main(args):
                             ]
                         ]
                     )
-                    and any([x in name for x in lora_target_modules])
+                    # and any([x in name for x in lora_target_modules])
                 ):
                     lora_module_names.add(name)
+
+                if args.lora_sam_encoder:
+                    if isinstance(module, cls) and "visual_model.image_encoder" in name:
+                        lora_module_names.add(name)
+                        
             return sorted(list(lora_module_names))
 
         lora_alpha = args.lora_alpha
@@ -144,6 +155,7 @@ def main(args):
     model.resize_token_embeddings(len(tokenizer))
 
     state_dict = torch.load(args.weight, map_location="cpu")
+    if 'module' in state_dict.keys(): state_dict = state_dict['module']
     model.load_state_dict(state_dict, strict=True)
 
     model = model.merge_and_unload()

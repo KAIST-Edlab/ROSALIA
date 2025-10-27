@@ -12,6 +12,7 @@ import torch
 from torch.nn import functional as F
 from torchvision.transforms.functional import resize  # type: ignore
 from torchvision.transforms.functional import to_pil_image
+from torchvision.transforms.functional import InterpolationMode
 
 
 class ResizeLongestSide:
@@ -32,6 +33,15 @@ class ResizeLongestSide:
             image.shape[0], image.shape[1], self.target_length
         )
         return np.array(resize(to_pil_image(image), target_size))
+
+    def apply_mask(self, mask: np.ndarray) -> np.ndarray:
+        """
+        Expects a numpy array with shape HxWxC in uint8 format.
+        """
+        target_size = self.get_preprocess_shape(
+            mask.shape[0], mask.shape[1], self.target_length
+        )
+        return np.array(resize(to_pil_image(mask), target_size, interpolation=InterpolationMode.NEAREST))
 
     def apply_coords(
         self, coords: np.ndarray, original_size: Tuple[int, ...]
