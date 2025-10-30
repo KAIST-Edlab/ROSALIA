@@ -558,7 +558,7 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
 
 
     model_engine.eval()
-    disease_list = ['cardiomegaly', 'consolidation', 'atelectasis', 'edema', 'effusion', 'opacity', 'pneumonia', 'congestion']
+    disease_list = ['cardiomegaly', 'consolidation', 'atelectasis', 'edema', 'effusion', 'opacity', 'pneumonia']
     question_type_list = ['basic', 'global', 'lesion inference']
     metric_list = ['intersection', 'union', 'iou']
     disease_meter_dict = {}
@@ -573,6 +573,10 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
 
     for question_type in question_type_list:
         question_meter_dict[question_type] = {'pos':AverageMeter(f"{question_type.title()}_pos", ":6.3f", Summary.SUM), 'neg': AverageMeter(f"{question_type.title()}_neg", ":6.3f", Summary.SUM)}
+        if question_type == 'global':
+            question_meter_dict[question_type]['pos_no_exact_match'] = AverageMeter(f"{question_type.title()}_pos_no_exact_match", ":6.3f", Summary.SUM)
+        elif question_type == 'lesion inference':
+            question_meter_dict[question_type]['pos_no_certainty'] = AverageMeter(f"{question_type.title()}_pos_no_certainty", ":6.3f", Summary.SUM)
 
     for input_dict in tqdm.tqdm(val_loader):
         torch.cuda.empty_cache()
@@ -633,6 +637,26 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
                 question_meter_dict[gt_text_dict['type']]['neg'].update(int(text_correct))
             else:
                 question_meter_dict[gt_text_dict['type']]['pos'].update(int(text_correct))
+
+            if gt_text_dict['type'] == 'global':
+                if pred_text_dict['location'] == 'right lung' or pred_text_dict['location'] == 'left lung':
+                    text_correct_no_exact_match = ('right' in gt_text_dict['location'] and 'right' in pred_text_dict['location']) or ('left' in gt_text_dict['location'] and 'left' in pred_text_dict['location'])
+                else: text_correct_no_exact_match = text_correct
+
+                if gt_text_dict['presence_label'] != 'no':
+                    question_meter_dict[gt_text_dict['type']]['pos_no_exact_match'].update(int(text_correct_no_exact_match))
+
+            if gt_text_dict['type'] == 'lesion inference':
+                text_correct_without_loc = (gt_text_dict['location']==pred_text_dict['location'])
+                if gt_text_dict['presence_label'] != 'no':
+                    question_meter_dict[gt_text_dict['type']]['pos_no_certainty'].update(int(text_correct_without_loc))
+
+        #         if question_type == 'global':
+        #     question_meter_dict[question_type]['pos_no_exact_match'] = AverageMeter(f"{question_type.title()}_pos_no_exact_match", ":6.3f", Summary.SUM)
+        #     question_meter_dict[question_type]['neg_no_exact_match'] = AverageMeter(f"{question_type.title()}_neg_no_exact_match", ":6.3f", Summary.SUM)
+        # elif question_type == 'lesion inference':
+        #     question_meter_dict[question_type]['pos_without_loc'] = AverageMeter(f"{question_type.title()}_pos_without_loc", ":6.3f", Summary.SUM)
+        #     question_meter_dict[question_type]['neg_without_loc'] = AverageMeter(f"{question_type.title()}_neg_without_loc", ":6.3f", Summary.SUM)
 
             # {"type":question_type, "target":target, "location":location, "presence_label":presence_label}
 
@@ -723,6 +747,12 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
             question_meter_dict[question_type]['pos'].all_reduce()
             question_meter_dict[question_type]['neg'].all_reduce()
 
+            if question_type == 'global':
+                question_meter_dict[question_type]['pos_no_exact_match'].all_reduce()
+            elif question_type == 'lesion inference':
+                question_meter_dict[question_type]['pos_no_certainty'].all_reduce()
+
+
     iou_class = intersection_meter.sum / (union_meter.sum + 1e-10)
     ciou = iou_class[1]
     giou = acc_iou_meter.avg[1]
@@ -756,17 +786,33 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
 
         if args.measure_text: 
             total_count, total_correct_count = 0, 0
+            total_count_pos, total_correct_count_pos = 0, 0
+            total_count_neg, total_correct_count_neg = 0, 0
+
             print('<Text accuracy>')
             for question_type in question_type_list:
                 question_pos_count, question_neg_count = int(question_meter_dict[question_type]['pos'].count), int(question_meter_dict[question_type]['neg'].count)
                 type_correct_count = int(question_meter_dict[question_type]['pos'].sum) + int(question_meter_dict[question_type]['neg'].sum)
+
                 total_count += (question_pos_count+question_neg_count)
                 total_correct_count += type_correct_count
+                total_count_pos+= question_pos_count
+                total_correct_count_pos+= int(question_meter_dict[question_type]['pos'].sum) 
+                total_count_neg+= question_neg_count
+                total_correct_count_neg+= int(question_meter_dict[question_type]['neg'].sum) 
+
                 question_pos_acc = question_meter_dict[question_type]['pos'].avg
                 question_neg_acc = question_meter_dict[question_type]['neg'].avg
-                print(f'{question_type.title()} - Total (n={question_pos_count+question_neg_count}): {type_correct_count/(question_pos_count+question_neg_count):.4f} / Pos (n={question_pos_count}): {question_pos_acc:.4f} / Neg (n={question_neg_count}): {question_neg_acc:.4f}')
+                if question_type == 'global':
+                    question_pos_acc_no_exact_match = question_meter_dict[question_type]['pos_no_exact_match'].avg
+                    print(f'{question_type.title()} - Total (n={question_pos_count+question_neg_count}): {type_correct_count/(question_pos_count+question_neg_count):.4f} / Pos (n={question_pos_count}): {question_pos_acc:.4f}, w/o exact match: {question_pos_acc_no_exact_match:.4f} / Neg (n={question_neg_count}): {question_neg_acc:.4f}') 
+                elif question_type == 'lesion inference':
+                    question_pos_acc_no_certainty = question_meter_dict[question_type]['pos_no_certainty'].avg
+                    print(f'{question_type.title()} - Total (n={question_pos_count+question_neg_count}): {type_correct_count/(question_pos_count+question_neg_count):.4f} / Pos (n={question_pos_count}): {question_pos_acc:.4f}, w/o certainty: {question_pos_acc_no_certainty:.4f} / Neg (n={question_neg_count}): {question_neg_acc:.4f}')
+                else:
+                    print(f'{question_type.title()} - Total (n={question_pos_count+question_neg_count}): {type_correct_count/(question_pos_count+question_neg_count):.4f} / Pos (n={question_pos_count}): {question_pos_acc:.4f} / Neg (n={question_neg_count}): {question_neg_acc:.4f}')
 
-            print(f'Total(n={total_count}): {total_correct_count/total_count:.4f}')
+            print(f'Total(n={total_count}): {total_correct_count/total_count:.4f} / Pos(n={total_count_pos}): {total_correct_count_pos/total_count_pos:.4f} / Neg(n={total_count}): {total_correct_count_neg/total_count_neg:.4f}')
 
 
     return giou_pos, ciou_pos

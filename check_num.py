@@ -3,11 +3,14 @@ import pdb
 qa_file = "/home/work/data/hangyul/mimic_cxr_not_filtered_qa/mimic_cxr_merged.json"
 
 with open(qa_file, "r", encoding="utf-8") as f:
-    qa_data = json.load(f)['val']
+    qa_data = json.load(f)['test']
 
 total_question_count = 0
 total_answer_count = 0
 total_pos_count = 0
+
+lesion_inference_count = {'edema':0, 'atelectasis':0, 'pneumonia':0}
+location_count_dict = {'edema':{}, 'atelectasis':{}, 'pneumonia':{}}
 
 for section_id, section_data in qa_data.items():
     section_qa = section_data.get("section_qa", {})
@@ -25,6 +28,13 @@ for section_id, section_data in qa_data.items():
                     total_question_count += len(qa_item.get("question", []))
                     total_answer_count += len(qa_item.get("answer", []))
                     if qa_item['seg'] is True: total_pos_count += len(qa_item.get("answer", []))
+                    template_list = qa_item.get("question_type", [])
+                    location_txt = str(qa_item.get("grounded_location", "none"))
+                    if 'template 4' in template_list: 
+                        lesion_inference_count[qa_item['target']] += 1
+                        if location_txt in location_count_dict[qa_item['target']].keys(): location_count_dict[qa_item['target']][location_txt] += 1
+                        else: location_count_dict[qa_item['target']][location_txt] = 1
+
         elif isinstance(qa_list, list):
             for qa_item in qa_list:
                 if not isinstance(qa_item, dict):
@@ -32,7 +42,16 @@ for section_id, section_data in qa_data.items():
                 total_question_count += len(qa_item.get("question", []))
                 total_answer_count += len(qa_item.get("answer", []))
                 if qa_item['seg'] is True: total_pos_count += len(qa_item.get("answer", []))
+                template_list = qa_item.get("question_type", [])
+                location_txt = str(qa_item.get("grounded_location", "none"))
+                if 'template 4' in template_list: 
+                    lesion_inference_count[qa_item['target']] += 1
+                    if location_txt in location_count_dict[qa_item['target']].keys(): location_count_dict[qa_item['target']][location_txt] += 1
+                    else: location_count_dict[qa_item['target']][location_txt] = 1
 
 print("총 question 개수:", total_question_count)
 print("총 answer 개수:", total_answer_count)
 print("총 pos sample 개수:", total_pos_count)
+print(f"lesion inference distribution: {lesion_inference_count}")
+for k, v in location_count_dict.items():
+    print(f"lesion inference location distribution - {k}: {v}")

@@ -71,6 +71,7 @@ class ReasonSegDataset(torch.utils.data.Dataset):
                             if not isinstance(qa_item, dict):
                                 continue
                             for i in range(len(qa_item['question'])):
+                                if qa_item['target'].lower() == 'congestion': continue
                                 sample_dict = {}
                                 sample_dict['question'] = qa_item['question'][i]
                                 sample_dict['answer'] = qa_item['answer'][i]
@@ -90,6 +91,7 @@ class ReasonSegDataset(torch.utils.data.Dataset):
                 elif isinstance(qa_list, list):
                     for qa_item in qa_list:
                         for i in range(len(qa_item['question'])):
+                            if qa_item['target'].lower() == 'congestion': continue
                             sample_dict = {}
                             sample_dict['question'] = qa_item['question'][i]
                             sample_dict['answer'] = qa_item['answer'][i]
