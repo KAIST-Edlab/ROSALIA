@@ -563,9 +563,14 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
     metric_list = ['intersection', 'union', 'iou']
     disease_meter_dict = {}
     question_meter_dict = {}
+    question_meter_dict_disease = {}
     non_empty_counter = {}
     for disease in disease_list: 
         disease_meter_dict[disease] = {'pos':{}, 'neg': {}}
+        question_meter_dict_disease[disease] = {}
+        for question_type in question_type_list:
+            question_meter_dict_disease[disease][question_type] = AverageMeter(f"{disease.title()}_{question_type.title()}_acc", ":6.3f", Summary.SUM)
+
         non_empty_counter[disease] = AverageMeter(f"{disease.title()}_non_empty_counter", ":6.3f", Summary.SUM)
         for metric in metric_list: 
             disease_meter_dict[disease]['pos'][metric] = AverageMeter(f"{disease.title()}_pos_{metric}", ":6.3f", Summary.SUM)
@@ -638,6 +643,8 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
             else:
                 question_meter_dict[gt_text_dict['type']]['pos'].update(int(text_correct))
 
+            question_meter_dict_disease[disease_category][gt_text_dict['type']].update(int(text_correct))
+
             if gt_text_dict['type'] == 'global':
                 if pred_text_dict['location'] == 'right lung' or pred_text_dict['location'] == 'left lung':
                     text_correct_no_exact_match = ('right' in gt_text_dict['location'] and 'right' in pred_text_dict['location']) or ('left' in gt_text_dict['location'] and 'left' in pred_text_dict['location'])
@@ -647,7 +654,7 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
                     question_meter_dict[gt_text_dict['type']]['pos_no_exact_match'].update(int(text_correct_no_exact_match))
 
             if gt_text_dict['type'] == 'lesion inference':
-                text_correct_without_loc = (gt_text_dict['location']==pred_text_dict['location'])
+                text_correct_without_loc = (gt_text_dict['target']==pred_text_dict['target'])
                 if gt_text_dict['presence_label'] != 'no':
                     question_meter_dict[gt_text_dict['type']]['pos_no_certainty'].update(int(text_correct_without_loc))
 
@@ -752,6 +759,9 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
             elif question_type == 'lesion inference':
                 question_meter_dict[question_type]['pos_no_certainty'].all_reduce()
 
+        for disease in disease_list: 
+            for v_dict in question_meter_dict_disease[disease].values(): v_dict.all_reduce()
+
 
     iou_class = intersection_meter.sum / (union_meter.sum + 1e-10)
     ciou = iou_class[1]
@@ -772,6 +782,9 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
         writer.add_scalar("val/giou_neg", giou_neg, epoch)
         print("Pos sample (n={}) - giou_pos: {:.4f}, ciou_pos: {:.4f} / Neg sample (n={}) - giou_neg: {:.4f}, ciou_neg: None".format(int(intersection_meter_pos.count), giou_pos, ciou_pos, int(intersection_meter_neg.count), giou_neg))
 
+        pos_disease_count_total = 0
+        non_empty_count_total = 0
+
         for disease in disease_list: 
             iou_disease_pos = disease_meter_dict[disease]['pos']['intersection'].sum / (disease_meter_dict[disease]['pos']['union'].sum + 1e-10)
             ciou_disease = iou_disease_pos[1]
@@ -782,7 +795,12 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
             neg_disease_count = int(disease_meter_dict[disease]['neg']['intersection'].count)
             non_empty_count = int(non_empty_counter[disease].count)
 
+            pos_disease_count_total += pos_disease_count
+            non_empty_count_total += non_empty_count
+
             print(f"{disease.title()} (n={pos_disease_count}) - giou_pos: {giou_disease_pos:.4f}, ciou_pos: {ciou_disease:.4f}, false_empty_ratio: {(pos_disease_count-non_empty_count)/(pos_disease_count):.4f} ({pos_disease_count-non_empty_count}/{pos_disease_count}) / No {disease.title()} (n={neg_disease_count}) - giou_neg: {giou_disease_neg:.4f}, ciou_neg: None")
+
+            print(f"total_non_empty_ratio: {(pos_disease_count_total-non_empty_count_total)/pos_disease_count_total:.4f} ({pos_disease_count_total-non_empty_count_total}/{pos_disease_count_total})")
 
         if args.measure_text: 
             total_count, total_correct_count = 0, 0
@@ -812,7 +830,18 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
                 else:
                     print(f'{question_type.title()} - Total (n={question_pos_count+question_neg_count}): {type_correct_count/(question_pos_count+question_neg_count):.4f} / Pos (n={question_pos_count}): {question_pos_acc:.4f} / Neg (n={question_neg_count}): {question_neg_acc:.4f}')
 
-            print(f'Total(n={total_count}): {total_correct_count/total_count:.4f} / Pos(n={total_count_pos}): {total_correct_count_pos/total_count_pos:.4f} / Neg(n={total_count}): {total_correct_count_neg/total_count_neg:.4f}')
+            print(f'Total(n={total_count}): {total_correct_count/total_count:.4f} / Pos(n={total_count_pos}): {total_correct_count_pos/total_count_pos:.4f} / Neg(n={total_count_neg}): {total_correct_count_neg/total_count_neg:.4f}')
+
+            for disease in disease_list: 
+                total_disease_count = 0
+                total_disease_correct_count = 0
+                disease_output_list = []
+                for question_type in question_type_list:
+                    question_acc = question_meter_dict_disease[disease][question_type].avg
+                    total_disease_count += int(question_meter_dict_disease[disease][question_type].count)
+                    total_disease_correct_count += int(question_meter_dict_disease[disease][question_type].sum)
+                    disease_output_list.append(f'{question_type.title()}: {question_acc:.4f}')
+                print(f'{disease.title()} - Total (n={total_disease_count}): {total_disease_correct_count/total_disease_count:.4f}' + ' / ' + ' / '.join(disease_output_list))
 
 
     return giou_pos, ciou_pos
@@ -820,7 +849,7 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
 
 def parse_answer(question: str, answer: str):
     question_text = question.lower().strip()
-    if re.search(r"predict its type|opacity", question_text):
+    if re.search(r"predict its type", question_text):
         question_type = "lesion inference"
     elif "segment" in question_text and "in the" in question_text:
         question_type = "basic"

@@ -135,13 +135,14 @@ def render_overlay(image_path: str, mask_path: Optional[str], target: str, locat
     canvas.save(out_path)
 
 base_image_dir = '/home/work/data/hangyul'
-json_dir = '/home/work/data/hangyul/mimic_cxr_new_qa_filtered/mimic_cxr_merged.json'
+json_dir = '/home/work/data/medgemma_test_lung_negative.json'
 # splits = ['val', 'test']
 splits = ['test']
 with open(json_dir, 'r') as f: json_file = json.load(f)
 
 for split in splits: 
-    dataset = json_file[split]
+    # dataset = json_file[split]
+    dataset = json_file
     prsence_count, absence_count = 0, 0
     presence_metadata, absence_metadata = [], []
 
@@ -159,6 +160,8 @@ for split in splits:
                         if not isinstance(qa_item, dict):
                             continue
                         if qa_item['target'].lower() == 'congestion': continue
+                        if qa_item.get("change_flag", False) is not None: continue
+                        # if qa_item.get("change_flag", False) is False and qa_item.get("new_flag", False) is False: continue
                         image_path = os.path.join(base_image_dir, 'mimic-cxr-dcm-png-histeq', f'{id}.png')
                         if qa_item['seg'] is True: 
                             mask_path = os.path.join(base_image_dir, 'seg_mask', qa_item['seg_mask_path'])
@@ -187,6 +190,8 @@ for split in splits:
             elif isinstance(qa_list, list):
                 for idx, qa_item in enumerate(qa_list):
                     if qa_item['target'].lower() == 'congestion': continue
+                    if qa_item.get("change_flag", False) is not None: continue
+                    # if qa_item.get("change_flag", False) is False and qa_item.get("new_flag", False) is False: continue
                     image_path = os.path.join(base_image_dir, 'mimic-cxr-dcm-png-histeq', f'{id}.png')
                     if qa_item['seg'] is True: 
                         mask_path = os.path.join(base_image_dir, 'seg_mask', qa_item['seg_mask_path'])

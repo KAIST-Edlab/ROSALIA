@@ -1,13 +1,14 @@
 import json
 import pdb 
-qa_file = "/home/work/data/hangyul/mimic_cxr_not_filtered_qa/mimic_cxr_merged.json"
+qa_file = "/home/work/data/hangyul/mimic_cxr_new_qa_filtered/mimic_cxr_merged.json"
 
 with open(qa_file, "r", encoding="utf-8") as f:
-    qa_data = json.load(f)['test']
+    qa_data = json.load(f)['train']
 
 total_question_count = 0
 total_answer_count = 0
 total_pos_count = 0
+opacity_bilat_count = 0
 
 lesion_inference_count = {'edema':0, 'atelectasis':0, 'pneumonia':0}
 location_count_dict = {'edema':{}, 'atelectasis':{}, 'pneumonia':{}}
@@ -34,6 +35,12 @@ for section_id, section_data in qa_data.items():
                         lesion_inference_count[qa_item['target']] += 1
                         if location_txt in location_count_dict[qa_item['target']].keys(): location_count_dict[qa_item['target']][location_txt] += 1
                         else: location_count_dict[qa_item['target']][location_txt] = 1
+                    question_list = qa_item.get("question", [])
+                    for question in question_list:
+                        if 'Segment the opacity in the left lung and right lung' in question and qa_item['seg'] is True:
+                            opacity_bilat_count += 1
+                        elif 'Segment the opacity in the right lung and left lung' in question and qa_item['seg'] is True:
+                            opacity_bilat_count += 1
 
         elif isinstance(qa_list, list):
             for qa_item in qa_list:
@@ -48,6 +55,12 @@ for section_id, section_data in qa_data.items():
                     lesion_inference_count[qa_item['target']] += 1
                     if location_txt in location_count_dict[qa_item['target']].keys(): location_count_dict[qa_item['target']][location_txt] += 1
                     else: location_count_dict[qa_item['target']][location_txt] = 1
+                question_list = qa_item.get("question", [])
+                for question in question_list:
+                    if 'Segment the opacity in the left lung and right lung' in question and qa_item['seg'] is True:
+                        opacity_bilat_count += 1
+                    elif 'Segment the opacity in the right lung and left lung' in question and qa_item['seg'] is True:
+                        opacity_bilat_count += 1
 
 print("총 question 개수:", total_question_count)
 print("총 answer 개수:", total_answer_count)
@@ -55,3 +68,4 @@ print("총 pos sample 개수:", total_pos_count)
 print(f"lesion inference distribution: {lesion_inference_count}")
 for k, v in location_count_dict.items():
     print(f"lesion inference location distribution - {k}: {v}")
+print(f"opacity bilat count: {opacity_bilat_count}")
