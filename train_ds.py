@@ -27,7 +27,9 @@ from torchvision.utils import save_image, make_grid
 from torchvision.transforms.functional import to_pil_image
 import cv2
 import re 
+import os 
 import pdb
+import pandas as pd
 
 
 def parse_args(args):
@@ -51,6 +53,7 @@ def parse_args(args):
     parser.add_argument("--load_in_8bit", action="store_true", default=False)
     parser.add_argument("--load_in_4bit", action="store_true", default=False)
     parser.add_argument("--dataset_dir", default="/home/work/data/hangyul", type=str) ## need to change
+    parser.add_argument("--save_dir", default="/home/work/data/hangyul/example", type=str) ## need to change
     parser.add_argument("--json_dir", default="/home/work/data/hangyul/mimic_cxr_not_filtered_qa/mimic_cxr_merged.json", type=str) ## need to change
     parser.add_argument("--cache_dir", default=None, type=str) ## need to change
     parser.add_argument("--log_base_dir", default="/home/work/data/runs", type=str) ## need to change
@@ -96,6 +99,8 @@ def parse_args(args):
     parser.add_argument("--debug", action="store_true", default=False)
     parser.add_argument("--batch_balance", action="store_true", default=False, help="Enable 1:1 pos/neg sampling for train only")
     parser.add_argument("--measure_text", action="store_true", default=False, help="Whether to measure text response")
+    parser.add_argument("--pos_only", action="store_true", default=False, help="Whether to use only positive cases")
+    parser.add_argument("--neg_only", action="store_true", default=False, help="Whether to use only negative cases")
     parser.add_argument(
         "--conv_type",
         default="llava_v1",
@@ -581,7 +586,10 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
         if question_type == 'global':
             question_meter_dict[question_type]['pos_no_exact_match'] = AverageMeter(f"{question_type.title()}_pos_no_exact_match", ":6.3f", Summary.SUM)
         elif question_type == 'lesion inference':
-            question_meter_dict[question_type]['pos_no_certainty'] = AverageMeter(f"{question_type.title()}_pos_no_certainty", ":6.3f", Summary.SUM)
+            question_meter_dict[question_type]['pos_with_certainty'] = AverageMeter(f"{question_type.title()}_pos_with_certainty", ":6.3f", Summary.SUM)
+
+    if args.measure_text: 
+        outcome_list = []
 
     for input_dict in tqdm.tqdm(val_loader):
         torch.cuda.empty_cache()
@@ -638,6 +646,8 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
             gt_text_dict = parse_answer(input_dict['questions_list'][0][0], gt_answer)
             pred_text_dict = parse_answer(input_dict['questions_list'][0][0], pred_answer)
             text_correct = (gt_text_dict==pred_text_dict)
+            if gt_text_dict['type'] == 'lesion inference' and gt_text_dict['presence_label'] != 'no': 
+                text_correct = (gt_text_dict['target']==pred_text_dict['target'])
             if gt_text_dict['presence_label'] == 'no':
                 question_meter_dict[gt_text_dict['type']]['neg'].update(int(text_correct))
             else:
@@ -654,22 +664,10 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
                     question_meter_dict[gt_text_dict['type']]['pos_no_exact_match'].update(int(text_correct_no_exact_match))
 
             if gt_text_dict['type'] == 'lesion inference':
-                text_correct_without_loc = (gt_text_dict['target']==pred_text_dict['target'])
+                text_correct_with_loc = (gt_text_dict==pred_text_dict)
                 if gt_text_dict['presence_label'] != 'no':
-                    question_meter_dict[gt_text_dict['type']]['pos_no_certainty'].update(int(text_correct_without_loc))
+                    question_meter_dict[gt_text_dict['type']]['pos_with_certainty'].update(int(text_correct_with_loc))
 
-        #         if question_type == 'global':
-        #     question_meter_dict[question_type]['pos_no_exact_match'] = AverageMeter(f"{question_type.title()}_pos_no_exact_match", ":6.3f", Summary.SUM)
-        #     question_meter_dict[question_type]['neg_no_exact_match'] = AverageMeter(f"{question_type.title()}_neg_no_exact_match", ":6.3f", Summary.SUM)
-        # elif question_type == 'lesion inference':
-        #     question_meter_dict[question_type]['pos_without_loc'] = AverageMeter(f"{question_type.title()}_pos_without_loc", ":6.3f", Summary.SUM)
-        #     question_meter_dict[question_type]['neg_without_loc'] = AverageMeter(f"{question_type.title()}_neg_without_loc", ":6.3f", Summary.SUM)
-
-            # {"type":question_type, "target":target, "location":location, "presence_label":presence_label}
-
-            # print(f'gt tuple: {gt_tuple} / pred tuple: {pred_tuple}')
-        ## output_dict["pred_masks"] - list, element shape [1, 1024, 1024], logits 
-        ## output_dict["gt_masks"] - list, element shape [1, 1024, 1024], one-hot gt mask  
         pred_masks = output_dict["pred_masks"]
         masks_list = output_dict["gt_masks"][0].int()
         output_list = (pred_masks[0] > 0).int()
@@ -679,32 +677,30 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
         image_original = input_dict["images"] * pixel_std[None, ...] + pixel_mean[None, ...]
         image_original = image_original.clamp(0,255) / 255
 
-        if args.vis_output:
-            image_name = input_dict["image_paths"][0].split('/')[-1]
-            def overlay_mask(image, mask, alpha=0.5):
-                color_mask = torch.zeros_like(image)
-                color_mask[:, 2] = 1
-                if mask.dim() == 2:
-                    mask = mask.unsqueeze(0)
-                if mask.size(0) == 1:
-                    mask = mask.repeat(3, 1, 1)
+            # def overlay_mask(image, mask, alpha=0.5):
+            #     color_mask = torch.zeros_like(image)
+            #     color_mask[:, 2] = 1
+            #     if mask.dim() == 2:
+            #         mask = mask.unsqueeze(0)
+            #     if mask.size(0) == 1:
+            #         mask = mask.repeat(3, 1, 1)
 
-                overlay = torch.where(mask[None, ...].bool(), (1 - alpha) * image + alpha * color_mask, image)
-                return overlay
+            #     overlay = torch.where(mask[None, ...].bool(), (1 - alpha) * image + alpha * color_mask, image)
+            #     return overlay
 
-            grid = make_grid(torch.cat([overlay_mask(image_original, masks_list[0].float()), overlay_mask(image_original, output_list[0].float())], dim=0), nrow=2) 
-            img = to_pil_image(grid)
+            # grid = make_grid(torch.cat([overlay_mask(image_original, masks_list[0].float()), overlay_mask(image_original, output_list[0].float())], dim=0), nrow=2) 
+            # img = to_pil_image(grid)
 
-            if masks_list[0].sum() != 0: 
-                os.makedirs(f'pos_example/{disease_category}', exist_ok=True)
-                img.save(f'pos_example/{disease_category}/{image_name}')
-            else: 
-                if masks_list[0].sum() == 0 and output_list[0].sum() != 0: 
-                    os.makedirs(f'neg_example/empty_wrong/{disease_category}', exist_ok=True)
-                    img.save(f'neg_example/empty_wrong/{disease_category}/{image_name}')
-                else:
-                    os.makedirs(f'neg_example/{disease_category}', exist_ok=True)
-                    img.save(f'neg_example/{disease_category}/{image_name}')
+            # if masks_list[0].sum() != 0: 
+            #     os.makedirs(f'pos_example/{disease_category}', exist_ok=True)
+            #     img.save(f'pos_example/{disease_category}/{image_name}')
+            # else: 
+            #     if masks_list[0].sum() == 0 and output_list[0].sum() != 0: 
+            #         os.makedirs(f'neg_example/empty_wrong/{disease_category}', exist_ok=True)
+            #         img.save(f'neg_example/empty_wrong/{disease_category}/{image_name}')
+            #     else:
+            #         os.makedirs(f'neg_example/{disease_category}', exist_ok=True)
+            #         img.save(f'neg_example/{disease_category}/{image_name}')
 
         intersection, union, acc_iou = 0.0, 0.0, 0.0
         for mask_i, output_i in zip(masks_list, output_list):
@@ -721,6 +717,44 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
             union
         ), acc_iou_meter.update(acc_iou, n=masks_list.shape[0])
 
+        if args.vis_output:
+            # if acc_iou[1] > 0.6:
+                image_name = input_dict["image_paths"][0].split('/')[-1].split('.')[0]
+                pos_dir = os.path.join(args.save_dir, 'positive')
+                # neg_dir = os.path.join(args.save_dir, 'negative')
+                os.makedirs(pos_dir, exist_ok=True)
+                # os.makedirs(neg_dir, exist_ok=True)
+
+                if masks_list[0].sum() != 0: 
+                    question_text = input_dict['questions_list'][0][0].lower().strip()
+                    if re.search(r"predict its type", question_text):
+                        sample_question_type = "lesion inference"
+                    elif "segment" in question_text and "in the" in question_text:
+                        sample_question_type = "basic"
+                    elif "segment" in question_text:
+                        sample_question_type = "global"
+                    save_image(masks_list[0].float(), os.path.join(pos_dir, f'{disease_category}_{sample_question_type}_{image_name}_gt.png'))
+                    save_image(output_list[0].float(), os.path.join(pos_dir, f'{disease_category}_{sample_question_type}_{image_name}_pred.png'))
+                    if args.measure_text: 
+                        save_dict = {'image_name': f'positive/{disease_category}_{sample_question_type}_{image_name}', 'iou':acc_iou[1], 'question_type':gt_text_dict['type'], 'disease':disease_category, 'presence': 'positive', 'question': input_dict['questions_list'][0][0], 'gt_text':gt_answer, 'pred_text':pred_answer}
+                        outcome_list.append(save_dict)
+
+                elif masks_list[0].sum() == 0 and 'xinlai' in args.version.lower():
+                    question_text = input_dict['questions_list'][0][0].lower().strip()
+                    if re.search(r"predict its type", question_text):
+                        sample_question_type = "lesion inference"
+                    elif "segment" in question_text and "in the" in question_text:
+                        sample_question_type = "basic"
+                    elif "segment" in question_text:
+                        sample_question_type = "global"
+                    neg_dir = os.path.join(args.save_dir, 'negative')
+                    os.makedirs(neg_dir, exist_ok=True)
+                    save_image(output_list[0].float(), os.path.join(neg_dir, f'{disease_category}_{sample_question_type}_{image_name}_pred.png'))
+                # elif masks_list[0].sum() == 0 and output_list[0].sum() == 0: 
+                    if args.measure_text: 
+                        save_dict = {'image_name': f'negative/{disease_category}_{sample_question_type}_{image_name}', 'iou':acc_iou[1], 'question_type':gt_text_dict['type'], 'disease':disease_category, 'presence': 'negative', 'question': input_dict['questions_list'][0][0], 'gt_text':gt_answer, 'pred_text':pred_answer}
+                        outcome_list.append(save_dict)
+
         if masks_list[0].sum() != 0:
             intersection_meter_pos.update(intersection), union_meter_pos.update(union), acc_iou_meter_pos.update(acc_iou, n=masks_list.shape[0])
             disease_meter_dict[disease_category]['pos']['intersection'].update(intersection)
@@ -734,6 +768,39 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
             disease_meter_dict[disease_category]['neg']['intersection'].update(intersection)
             disease_meter_dict[disease_category]['neg']['union'].update(union)
             disease_meter_dict[disease_category]['neg']['iou'].update(acc_iou, n=masks_list.shape[0])
+
+
+    # Gather outcome_list from all ranks if measure_text is enabled
+    if args.measure_text:
+        if args.distributed and torch.distributed.is_initialized():
+            # Gather outcome_list from all ranks
+            world_size = torch.distributed.get_world_size()
+            gathered_outcome_lists = [None] * world_size
+            torch.distributed.all_gather_object(gathered_outcome_lists, outcome_list)
+            
+            # Merge all outcome lists on rank 0
+            if args.local_rank == 0:
+                merged_outcome_list = []
+                for rank_outcome_list in gathered_outcome_lists:
+                    merged_outcome_list.extend(rank_outcome_list)
+                outcome_list = merged_outcome_list
+        else:
+            # Single GPU case - outcome_list already contains all data
+            pass
+
+    # Save outcome_list to xlsx file on rank 0
+    if args.measure_text and args.local_rank == 0 and len(outcome_list) > 0:
+        try:
+            # Create DataFrame from outcome_list
+            df = pd.DataFrame(outcome_list)
+            # Save to xlsx file
+            filename = "outcome_results_pos_only.xlsx" if args.pos_only else "outcome_results.xlsx"
+            xlsx_path = os.path.join(args.save_dir, filename)
+            df.to_excel(xlsx_path, index=False)
+            print(f"Saved outcome_list with {len(outcome_list)} entries to {xlsx_path}")
+        except Exception as e:
+            print(f"Warning: Failed to save outcome_list to xlsx: {e}")
+            print("Note: You may need to install openpyxl: pip install openpyxl")
 
     intersection_meter.all_reduce()
     union_meter.all_reduce()
@@ -757,11 +824,10 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
             if question_type == 'global':
                 question_meter_dict[question_type]['pos_no_exact_match'].all_reduce()
             elif question_type == 'lesion inference':
-                question_meter_dict[question_type]['pos_no_certainty'].all_reduce()
+                question_meter_dict[question_type]['pos_with_certainty'].all_reduce()
 
         for disease in disease_list: 
             for v_dict in question_meter_dict_disease[disease].values(): v_dict.all_reduce()
-
 
     iou_class = intersection_meter.sum / (union_meter.sum + 1e-10)
     ciou = iou_class[1]
@@ -800,7 +866,7 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
 
             print(f"{disease.title()} (n={pos_disease_count}) - giou_pos: {giou_disease_pos:.4f}, ciou_pos: {ciou_disease:.4f}, false_empty_ratio: {(pos_disease_count-non_empty_count)/(pos_disease_count):.4f} ({pos_disease_count-non_empty_count}/{pos_disease_count}) / No {disease.title()} (n={neg_disease_count}) - giou_neg: {giou_disease_neg:.4f}, ciou_neg: None")
 
-            print(f"total_non_empty_ratio: {(pos_disease_count_total-non_empty_count_total)/pos_disease_count_total:.4f} ({pos_disease_count_total-non_empty_count_total}/{pos_disease_count_total})")
+        print(f"total_non_empty_ratio: {(pos_disease_count_total-non_empty_count_total)/pos_disease_count_total:.4f} ({pos_disease_count_total-non_empty_count_total}/{pos_disease_count_total})")
 
         if args.measure_text: 
             total_count, total_correct_count = 0, 0
@@ -825,8 +891,8 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
                     question_pos_acc_no_exact_match = question_meter_dict[question_type]['pos_no_exact_match'].avg
                     print(f'{question_type.title()} - Total (n={question_pos_count+question_neg_count}): {type_correct_count/(question_pos_count+question_neg_count):.4f} / Pos (n={question_pos_count}): {question_pos_acc:.4f}, w/o exact match: {question_pos_acc_no_exact_match:.4f} / Neg (n={question_neg_count}): {question_neg_acc:.4f}') 
                 elif question_type == 'lesion inference':
-                    question_pos_acc_no_certainty = question_meter_dict[question_type]['pos_no_certainty'].avg
-                    print(f'{question_type.title()} - Total (n={question_pos_count+question_neg_count}): {type_correct_count/(question_pos_count+question_neg_count):.4f} / Pos (n={question_pos_count}): {question_pos_acc:.4f}, w/o certainty: {question_pos_acc_no_certainty:.4f} / Neg (n={question_neg_count}): {question_neg_acc:.4f}')
+                    question_pos_acc_no_certainty = question_meter_dict[question_type]['pos_with_certainty'].avg
+                    print(f'{question_type.title()} - Total (n={question_pos_count+question_neg_count}): {type_correct_count/(question_pos_count+question_neg_count):.4f} / Pos (n={question_pos_count}): {question_pos_acc:.4f}, with certainty: {question_pos_acc_no_certainty:.4f} / Neg (n={question_neg_count}): {question_neg_acc:.4f}')
                 else:
                     print(f'{question_type.title()} - Total (n={question_pos_count+question_neg_count}): {type_correct_count/(question_pos_count+question_neg_count):.4f} / Pos (n={question_pos_count}): {question_pos_acc:.4f} / Neg (n={question_neg_count}): {question_neg_acc:.4f}')
 
@@ -842,7 +908,6 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
                     total_disease_correct_count += int(question_meter_dict_disease[disease][question_type].sum)
                     disease_output_list.append(f'{question_type.title()}: {question_acc:.4f}')
                 print(f'{disease.title()} - Total (n={total_disease_count}): {total_disease_correct_count/total_disease_count:.4f}' + ' / ' + ' / '.join(disease_output_list))
-
 
     return giou_pos, ciou_pos
 
@@ -863,9 +928,12 @@ def parse_answer(question: str, answer: str):
 
     # --- Lesion Inference ---
     if question_type == "lesion inference":
-        m = re.search(r"(?:highly suggestive of|possibly reflects)\s+(.+?)[\.\n]*$", lower)
+        m = re.search(r"(?:highly suggestive of|possibly reflects|is no)\s+(.+?)[\.\n]*$", lower)
         target, location = (m.group(1), 'not extracted') if m else ('not extracted', 'not extracted')
-        presence_label = 'definite' if 'highly suggestive of' in lower else 'tentative'
+        if 'highly suggestive of' in lower: presence_label = 'definite'
+        elif 'possibly reflects' in lower: presence_label = 'tentative'
+        elif 'is no' in lower: presence_label = 'no'
+        else: presence_label = 'not extracted'
 
     # --- Basic ---
     elif question_type == "basic":

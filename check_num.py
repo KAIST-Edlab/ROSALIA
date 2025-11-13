@@ -1,17 +1,20 @@
 import json
 import pdb 
-qa_file = "/home/work/data/hangyul/mimic_cxr_new_qa_filtered/mimic_cxr_merged.json"
+qa_file = "/home/work/data/hangyul/mimic_cxr_final/test.json"
 
 with open(qa_file, "r", encoding="utf-8") as f:
-    qa_data = json.load(f)['train']
+    qa_data = json.load(f) # qa_data = json.load(f)['test']
 
 total_question_count = 0
 total_answer_count = 0
 total_pos_count = 0
 opacity_bilat_count = 0
 
-lesion_inference_count = {'edema':0, 'atelectasis':0, 'pneumonia':0}
-location_count_dict = {'edema':{}, 'atelectasis':{}, 'pneumonia':{}}
+lesion_inference_count = {'edema':0, 'atelectasis':0, 'pneumonia':0, 'opacity':0}
+location_count_dict = {'edema':{}, 'atelectasis':{}, 'pneumonia':{}, 'opacity':{}}
+change_flag_true_count = 0
+change_flag_none_count = 0
+new_flag_count = 0
 
 for section_id, section_data in qa_data.items():
     section_qa = section_data.get("section_qa", {})
@@ -42,6 +45,10 @@ for section_id, section_data in qa_data.items():
                         elif 'Segment the opacity in the right lung and left lung' in question and qa_item['seg'] is True:
                             opacity_bilat_count += 1
 
+                    if qa_item.get("change_flag", False) is True: change_flag_true_count += 1
+                    if qa_item.get("change_flag", False) is None: change_flag_none_count += 1
+                    if qa_item.get("new_flag", False) is not False: new_flag_count += 1
+
         elif isinstance(qa_list, list):
             for qa_item in qa_list:
                 if not isinstance(qa_item, dict):
@@ -62,6 +69,10 @@ for section_id, section_data in qa_data.items():
                     elif 'Segment the opacity in the right lung and left lung' in question and qa_item['seg'] is True:
                         opacity_bilat_count += 1
 
+                if qa_item.get("change_flag", False) is True: change_flag_true_count += 1
+                if qa_item.get("change_flag", False) is None: change_flag_none_count += 1
+                if qa_item.get("new_flag", False) is not False: new_flag_count += 1
+
 print("총 question 개수:", total_question_count)
 print("총 answer 개수:", total_answer_count)
 print("총 pos sample 개수:", total_pos_count)
@@ -69,3 +80,4 @@ print(f"lesion inference distribution: {lesion_inference_count}")
 for k, v in location_count_dict.items():
     print(f"lesion inference location distribution - {k}: {v}")
 print(f"opacity bilat count: {opacity_bilat_count}")
+print(f'change_flag true : {change_flag_true_count} / change_flag none: {change_flag_none_count} / new_flag: {new_flag_count}')

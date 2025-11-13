@@ -135,7 +135,7 @@ def render_overlay(image_path: str, mask_path: Optional[str], target: str, locat
     canvas.save(out_path)
 
 base_image_dir = '/home/work/data/hangyul'
-json_dir = '/home/work/data/medgemma_test_lung_negative.json'
+json_dir = '/home/work/data/hangyul/mimic_cxr_final/medgemma_test_1105_2.json'
 # splits = ['val', 'test']
 splits = ['test']
 with open(json_dir, 'r') as f: json_file = json.load(f)
@@ -160,7 +160,7 @@ for split in splits:
                         if not isinstance(qa_item, dict):
                             continue
                         if qa_item['target'].lower() == 'congestion': continue
-                        if qa_item.get("change_flag", False) is not None: continue
+                        # if qa_item.get("change_flag", False) is False and qa_item.get("new_flag", False) is False: continue
                         # if qa_item.get("change_flag", False) is False and qa_item.get("new_flag", False) is False: continue
                         image_path = os.path.join(base_image_dir, 'mimic-cxr-dcm-png-histeq', f'{id}.png')
                         if qa_item['seg'] is True: 
@@ -178,10 +178,10 @@ for split in splits:
                         if location == "": location = qa_item.get("grounded_location", "")
                         location = str(location)
                         target = qa_item['target']
-                        out_dir = os.path.join(base_image_dir, f'human_eval_{split}_set', presence_label)
+                        out_dir = os.path.join(base_image_dir, f'human_eval_{split}_set_new', presence_label)
                         out_name = f"{presence_label}_{sample_idx:05d}.png"
                         out_path = os.path.join(out_dir, out_name)
-                        render_overlay(image_path, mask_path, target, location, report, presence_label, out_path)
+                        # render_overlay(image_path, mask_path, target, location, report, presence_label, out_path)
                         item_dict = {'filename': out_name.replace('.png', ''), 'presence_label':presence_label, 'sample_key':sample_key, 'dicom_id':id, 'target':target, 'location':location, 'question':qa_item['question'][0]}
                         if presence_label == 'presence': presence_metadata.append(item_dict)
                         else: absence_metadata.append(item_dict)
@@ -190,7 +190,7 @@ for split in splits:
             elif isinstance(qa_list, list):
                 for idx, qa_item in enumerate(qa_list):
                     if qa_item['target'].lower() == 'congestion': continue
-                    if qa_item.get("change_flag", False) is not None: continue
+                    # if qa_item.get("change_flag", False) is False and qa_item.get("new_flag", False) is False: continue
                     # if qa_item.get("change_flag", False) is False and qa_item.get("new_flag", False) is False: continue
                     image_path = os.path.join(base_image_dir, 'mimic-cxr-dcm-png-histeq', f'{id}.png')
                     if qa_item['seg'] is True: 
@@ -208,18 +208,19 @@ for split in splits:
                     if location == "": location = qa_item.get("grounded_location", "")
                     location = str(location)
                     target = qa_item['target']
-                    out_dir = os.path.join(base_image_dir, f'human_eval_{split}_set', presence_label)
+                    out_dir = os.path.join(base_image_dir, f'human_eval_{split}_set_new', presence_label)
                     out_name = f"{presence_label}_{sample_idx:05d}.png"
                     out_path = os.path.join(out_dir, out_name)
-                    render_overlay(image_path, mask_path, target, location, report, presence_label, out_path)
+                    # render_overlay(image_path, mask_path, target, location, report, presence_label, out_path)
                     item_dict = {'filename': out_name.replace('.png', ''), 'presence_label':presence_label, 'sample_key':sample_key, 'dicom_id':id, 'target':target, 'location':location, 'question':qa_item['question'][0]}
                     if presence_label == 'presence': presence_metadata.append(item_dict)
                     else: absence_metadata.append(item_dict)
 
     # Save metadata as CSV files
     if presence_metadata:
-        os.makedirs(os.path.join(base_image_dir, f'human_eval_{split}_set'), exist_ok=True)
-        presence_csv_path = os.path.join(base_image_dir, f'human_eval_{split}_set', 'presence_metadata.csv')
+        os.makedirs(os.path.join(base_image_dir, f'human_eval_{split}_set_new'), exist_ok=True)
+        presence_csv_path = 'presence_final.csv'
+        # presence_csv_path = os.path.join(base_image_dir, f'human_eval_{split}_set_new', 'presence_metadata.csv')
         with open(presence_csv_path, 'w', newline='', encoding='utf-8') as csvfile:
             fieldnames = list(presence_metadata[0].keys()) + ['quality', 'comment']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -231,8 +232,9 @@ for split in splits:
         print(f"Saved {len(presence_metadata)} presence samples to {presence_csv_path}")
     
     if absence_metadata:
-        os.makedirs(os.path.join(base_image_dir, f'human_eval_{split}_set'), exist_ok=True)
-        absence_csv_path = os.path.join(base_image_dir, f'human_eval_{split}_set', 'absence_metadata.csv')
+        os.makedirs(os.path.join(base_image_dir, f'human_eval_{split}_set_new'), exist_ok=True)
+        absence_csv_path = 'absence_final.csv'
+        # absence_csv_path = os.path.join(base_image_dir, f'human_eval_{split}_set_new', 'absence_metadata.csv')
         with open(absence_csv_path, 'w', newline='', encoding='utf-8') as csvfile:
             fieldnames = list(absence_metadata[0].keys()) + ['quality', 'comment']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)

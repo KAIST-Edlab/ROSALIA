@@ -30,7 +30,6 @@ from .multimodal_encoder.builder import build_vision_tower
 class LlavaMetaModel:
     def __init__(self, config):
         super(LlavaMetaModel, self).__init__(config)
-
         if hasattr(config, "mm_vision_tower"):
             self.vision_tower = build_vision_tower(config, delay_load=True)
             if 'llava' in config._name_or_path and '1.5'in config._name_or_path:

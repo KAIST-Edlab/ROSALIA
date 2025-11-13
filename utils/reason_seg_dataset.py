@@ -72,6 +72,8 @@ class ReasonSegDataset(torch.utils.data.Dataset):
                                 continue
                             for i in range(len(qa_item['question'])):
                                 if qa_item['target'].lower() == 'congestion': continue
+                                if args.pos_only and qa_item['seg'] is False: continue
+                                if args.neg_only and qa_item['seg'] is True: continue
                                 sample_dict = {}
                                 sample_dict['question'] = qa_item['question'][i]
                                 sample_dict['answer'] = qa_item['answer'][i]
@@ -92,6 +94,8 @@ class ReasonSegDataset(torch.utils.data.Dataset):
                     for qa_item in qa_list:
                         for i in range(len(qa_item['question'])):
                             if qa_item['target'].lower() == 'congestion': continue
+                            if args.pos_only and qa_item['seg'] is False: continue
+                            if args.neg_only and qa_item['seg'] is True: continue
                             sample_dict = {}
                             sample_dict['question'] = qa_item['question'][i]
                             sample_dict['answer'] = qa_item['answer'][i]
