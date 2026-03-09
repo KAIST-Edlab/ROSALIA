@@ -1,10 +1,10 @@
 # Instruction-Guided Lesion Segmentation for Chest X-rays with Automatically Generated Large-Scale Dataset (CVPR 2026 Main)
 
-This repository is the official implementation of [Instruction-Guided Lesion Segmentation for Chest X-rays with Automatically Generated Large-Scale Dataset (CVPR 2026 Main)](https://arxiv.org/abs/2511.15186), led by
+This repository is the official implementation of [Instruction-Guided Lesion Segmentation for Chest X-rays with Automatically Generated Large-Scale Dataset](https://arxiv.org/abs/2511.15186), led by
 
-[Geon Choi](https://checkoneee.github.io/), [Hangyul Yoon](), [Hyunju Shi](), [Hyunki Park](), [Sang Hoon Seo](), [Eunho Yang](https://mli.kaist.ac.kr/), [Edward Choi](https://mp2893.com/index.html)
+[Geon Choi](https://checkoneee.github.io/), [Hangyul Yoon], [Hyunju Shi], [Hyunki Park], [Sang Hoon Seo], [Eunho Yang](https://mli.kaist.ac.kr/), [Edward Choi](https://mp2893.com/index.html)
 
-![main figure](assets/teaser.pdf)
+![main figure](assets/teaser.jpg)
 
 [![arXiv](https://img.shields.io/badge/arXiv-2505.18600-b31b1b.svg)](https://arxiv.org/abs/2511.15186)
 
