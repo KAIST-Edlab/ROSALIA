@@ -6,7 +6,7 @@ This repository is the official implementation of [Instruction-Guided Lesion Seg
 
 ![main figure](assets/teaser.jpg)
 
-[![arXiv](https://img.shields.io/badge/2511.15186.18600-b31b1b.svg)](https://arxiv.org/abs/2511.15186)
+[![arXiv](https://img.shields.io/badge/arXiv-2511.15186-b31b1b.svg)](https://arxiv.org/abs/2511.15186)
 
 ---
 ## 🔥 Summary
