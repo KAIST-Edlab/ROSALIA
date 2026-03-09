@@ -60,6 +60,8 @@ cd ROSALIA
 conda create -n rosalia python=3.10
 conda activate rosalia
 pip install -r requirements.txt
+
+# The above requirements file assumes your environment uses cuda 12.6.
 ```
 
 ## 📝 Citation
