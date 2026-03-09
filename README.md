@@ -62,22 +62,22 @@ base/
 
 `mimic_ils_instruction_answer.json` encapsulates comprehensive metadata and instruction-answer annotations, structured with the following keys:
 
-subject_id: Unique identifier for the patient.
-dicom_id: Unique identifier for the CXR image.
-image_path: Relative path to the image consistent with the MIMIC-CXR-JPG structure.
-section_name: Source section parsed from the radiology report (e.g., findings, impression, last_paragraph).
-section_content: Text content of the parsed section.
-instruction_answer_pairs: A dictionary containing the generated instruction and answer pairs.
-    pair_id: Unique identifier for the specific instruction-answer pair.
-    instruction: The input prompt or query provided to the model.
-    answer: The expected output response. [SEG] is a special token for segmentation tasks.
-    type: The category of the instruction (e.g., basic, global, lesion_inference).
-    target: The specific pathological finding or lesion class targeted by the instruction.
-    reported_location: Anatomical locations mentioned in the original radiology report.
-    grounded_location: Validated anatomical locations corresponding to the segmentation mask.
-    sent_idx: Index of the source sentence within the report section.
-    seg: Boolean flag indicating whether the pair involves a segmentation task (true for positive samples).
-    seg_mask_path: Relative path to the corresponding binary segmentation mask (available when seg is true).
+- **subject_id**: Unique identifier for the patient.
+- **dicom_id**: Unique identifier for the CXR image.
+- **image_path**: Relative path to the image consistent with the MIMIC-CXR-JPG structure.
+- **section_name**: Source section parsed from the radiology report (e.g., findings, impression, last_paragraph).
+- **section_content**: Text content of the parsed section.
+- **instruction_answer_pairs**: A dictionary containing the generated instruction and answer pairs.
+  - **pair_id**: Unique identifier for the specific instruction-answer pair.
+  - **instruction**: The input prompt or query provided to the model.
+  - **answer**: The expected output response. `[SEG]` is a special token for segmentation tasks.
+  - **type**: The category of the instruction (e.g., basic, global, lesion_inference).
+  - **target**: The specific pathological finding or lesion class targeted by the instruction.
+  - **reported_location**: Anatomical locations mentioned in the original radiology report.
+  - **grounded_location**: Validated anatomical locations corresponding to the segmentation mask.
+  - **sent_idx**: Index of the source sentence within the report section.
+  - **seg**: Boolean flag indicating whether the pair involves a segmentation task (true for positive samples).
+  - **seg_mask_path**: Relative path to the corresponding binary segmentation mask (available when seg is true).
 
 
 ```
