@@ -1,7 +1,7 @@
 <div align="center">
 
 # Instruction-Guided Lesion Segmentation for Chest X-rays with Automatically Generated Large-Scale Dataset
-(CVPR 2026 Main)
+# (CVPR 2026 Main)
 
 [![arXiv](https://img.shields.io/badge/arXiv-2511.15186-b31b1b.svg)](https://arxiv.org/abs/2511.15186)
 
