@@ -7,15 +7,6 @@
 [Geon Choi*](https://checkoneee.github.io/), Hangyul Yoon*, Hyunju Shin, Hyunki Park, Sang Hoon Seo, [Eunho Yang](https://mli.kaist.ac.kr/), [Edward Choi](https://mp2893.com/index.html)<br>
 (*: Equal Contribution)
 
-```
-@article{choi2025instruction,
-  title={Instruction-Guided Lesion Segmentation for Chest X-rays with Automatically Generated Large-Scale Dataset},
-  author={Choi, Geon and Yoon, Hangyul and Shin, Hyunju and Park, Hyunki and Seo, Sang Hoon and Yang, Eunho and Choi, Edward},
-  journal={arXiv preprint arXiv:2511.15186},
-  year={2025}
-}
-```
-
 ![main figure](assets/teaser.jpg)
 
 </div>
@@ -53,3 +44,15 @@ pip install -r requirements.txt
 |Models|Checkpoints|
 |:---------|:--------|
 |ROSALIA|[Hugging Face]()
+
+## 📝 Citation
+If you find our method useful, please cite as below or leave a star to this repository.
+
+```
+@article{choi2025instruction,
+  title={Instruction-Guided Lesion Segmentation for Chest X-rays with Automatically Generated Large-Scale Dataset},
+  author={Choi, Geon and Yoon, Hangyul and Shin, Hyunju and Park, Hyunki and Seo, Sang Hoon and Yang, Eunho and Choi, Edward},
+  journal={arXiv preprint arXiv:2511.15186},
+  year={2025}
+}
+```
