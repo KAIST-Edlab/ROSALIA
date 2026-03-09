@@ -35,9 +35,13 @@ In the meantime, we are providing temporary access via a password-protected Goog
 
 1. Complete the required **CITI training** program for human subjects research.
 2. Send an email to `choigeon@kaist.ac.kr` with proof of your CITI program completion (and/or a screenshot of your credentialed PhysioNet profile).
-3. Upon verification, we will reply with a direct download link to the dataset.
+3. Once verified, we will reply with the password to extract the downloaded dataset.
 
 *🚨 **Note:** Once the dataset is officially published and available on PhysioNet, this Google Drive link will be deprecated, and all downloads will be redirected to the PhysioNet platform.*
+
+- [Google Drive Link](https://drive.google.com/file/d/15ffBB3hLXwferIJinfM5raJYhugIkPxn/view?usp=sharing) *(Password required)*
+
+---
 
 ## 🤖 Model
 The pre-trained weights for our **ROSALIA** model are publicly available on Hugging Face. You can download the checkpoints directly from the link below.
