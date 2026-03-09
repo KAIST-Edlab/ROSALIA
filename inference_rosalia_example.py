@@ -64,7 +64,7 @@ def initialize_model():
     image_size = 1024
     
     model = LISAForCausalLM.from_pretrained(
-        "hangyulmd/rosalia",
+        "checkone/ROSALIA-7B-v1",
         low_cpu_mem_usage=True,
         vision_tower=vision_tower_name,
         seg_token_idx=seg_token_idx,
