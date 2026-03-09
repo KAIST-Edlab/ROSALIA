@@ -12,7 +12,7 @@
 </div>
 
 ---
-## 🔥 Summary
+## 🎯 Summary
 
 Identifying and segmenting lesions in Chest X-rays (CXR) is crucial for accurate medical diagnosis, but conventional approaches face significant challenges:
 
@@ -27,6 +27,12 @@ By interpreting simple, user-friendly instructions instead of relying on complex
 - [Feb 2026] 🎉 Our paper has been accepted to **CVPR 2026**!
 - [Nov 2025] 📜 Preprint is available on [arXiv](https://arxiv.org/abs/2511.15186).
 
+## 📥 Dataset and Models
+
+|Models|Checkpoints|
+|:---------|:--------|
+|ROSALIA|[Hugging Face]()
+
 ## 🛠️ Setup
 First, create your environment. We recommend using the following commands. 
 
@@ -38,12 +44,6 @@ conda create -n rosalia python=3.10
 conda activate rosalia
 pip install -r requirements.txt
 ```
-
-## ⏳ Models
-
-|Models|Checkpoints|
-|:---------|:--------|
-|ROSALIA|[Hugging Face]()
 
 ## 📝 Citation
 If you find our method useful, please cite as below or leave a star to this repository.
