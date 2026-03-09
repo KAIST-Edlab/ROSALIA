@@ -31,88 +31,28 @@ By grounding textual clinical instructions with visual features, our model can s
 First, create your environment. We recommend using the following commands. 
 
 ```
-git clone https://github.com/bryanswkim/Chain-of-Zoom.git
-cd Chain-of-Zoom
+git clone https://github.com/checkoneee/ROSALIA.git
+cd ROSALIA
 
-conda create -n coz python=3.10
-conda activate coz
+conda create -n rosalia python=3.10
+conda activate rosalia
 pip install -r requirements.txt
 ```
 
-## ⏳ Models
+## ⏳ Model
 
 |Models|Checkpoints|
 |:---------|:--------|
-|Stable Diffusion v3|[Hugging Face](https://huggingface.co/stabilityai/stable-diffusion-3-medium)
-|Qwen2.5-VL-3B-Instruct|[Hugging Face](https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct)
-|RAM|[Hugging Face](https://huggingface.co/spaces/xinyu1205/recognize-anything/blob/main/ram_swin_large_14m.pth)
-
-## ⚡ Quick Inference
-You can quickly check the results of using **CoZ** with the following example:
-```
-python inference_coz.py \
-  -i samples \
-  -o inference_results/coz_vlmprompt \
-  --rec_type recursive_multiscale \
-  --prompt_type vlm \
-  --lora_path ckpt/SR_LoRA/model_20001.pkl \
-  --vae_path ckpt/SR_VAE/vae_encoder_20001.pt \
-  --vlm_lora_path ckpt/VLM_LoRA/checkpoint-10000 \
-  --pretrained_model_name_or_path 'stabilityai/stable-diffusion-3-medium-diffusers' \
-  --ram_ft_path ckpt/DAPE/DAPE.pth \
-  --ram_path ckpt/RAM/ram_swin_large_14m.pth \
-  --save_prompts;
-```
-Which will give a result like below:
-
-![main figure](assets/example_result.png)
-
-## 🔬 Efficient Memory
-Using ```--efficient_memory``` allows **CoZ** to run on a single GPU with 24GB VRAM, but highly increases inference time due to offloading. \
-We recommend using two GPUs.
-
-## 🌄 Full Image Super-Resolution
-Although our main focus is zooming into local areas, **CoZ** can be easily applied to super-resolution of full images. Try out the code below!
-
-```
-python inference_coz_full.py \
-  -i samples \
-  -o inference_results/coz_full \
-  --rec_type recursive_multiscale \
-  --prompt_type vlm \
-  --lora_path ckpt/SR_LoRA/model_20001.pkl \
-  --vae_path ckpt/SR_VAE/vae_encoder_20001.pt \
-  --vlm_lora_path ckpt/VLM_LoRA/checkpoint-10000 \
-  --pretrained_model_name_or_path 'stabilityai/stable-diffusion-3-medium-diffusers' \
-  --ram_ft_path ckpt/DAPE/DAPE.pth \
-  --ram_path ckpt/RAM/ram_swin_large_14m.pth;
-```
-
-## 🚆 Training the SR Backbone Model
-**Chain-of-Zoom** is model-agnostic and can be used with *any* pretrained text-aware SR model. In this repository we leverage OSEDiff trained with Stable Diffusion 3 Medium as its backbone model. This requires some additional installations:
-
-```
-pip install wandb opencv-python basicsr==1.4.2
-
-pip install --no-deps --extra-index-url https://download.pytorch.org/whl/cu121 xformers==0.0.28.post1
-```
-
-Please refer to the [OSEDiff](https://github.com/cswry/OSEDiff) repository for training configurations (ex. preparing training data). Now train the SR backbone model:
-```
-bash scripts/train/train_osediff_sd3.sh
-```
+|ROSALIA|[Hugging Face]()
 
 ## 📝 Citation
 If you find our method useful, please cite as below or leave a star to this repository.
 
 ```
-@article{kim2025chain,
-  title={Chain-of-Zoom: Extreme Super-Resolution via Scale Autoregression and Preference Alignment},
-  author={Kim, Bryan Sangwoo and Kim, Jeongsol and Ye, Jong Chul},
-  journal={arXiv preprint arXiv:2505.18600},
+@article{choi2025instruction,
+  title={Instruction-Guided Lesion Segmentation for Chest X-rays with Automatically Generated Large-Scale Dataset},
+  author={Choi, Geon and Yoon, Hangyul and Shin, Hyunju and Park, Hyunki and Seo, Sang Hoon and Yang, Eunho and Choi, Edward},
+  journal={arXiv preprint arXiv:2511.15186},
   year={2025}
 }
 ```
-
-## 🤗 Acknowledgements
-We thank the authors of [OSEDiff](https://github.com/cswry/OSEDiff) for sharing their awesome work!
