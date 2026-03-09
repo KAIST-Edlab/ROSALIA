@@ -29,9 +29,27 @@ By interpreting simple, user-friendly instructions instead of relying on complex
 
 ## 📥 Dataset and Models
 
-|Models|Checkpoints|
-|:---------|:--------|
-|ROSALIA|[Hugging Face]()
+### 📊 MIMIC-ILS Dataset
+Our **MIMIC-ILS dataset** is currently under submission to [PhysioNet](https://physionet.org/). 
+
+In the meantime, we are providing temporary access via a password-protected Google Drive link. Since our dataset is derived from MIMIC-CXR, users must meet the same credentialing requirements. To obtain the password, please follow these steps:
+
+1. Complete the required **CITI training** program for human subjects research.
+2. Send an email to `[Your Email Address]` with proof of your CITI program completion (and/or a screenshot of your credentialed PhysioNet profile).
+3. Once verified, we will reply with the password to extract the downloaded dataset.
+
+*🚨 **Note:** Once the dataset is officially published and available on PhysioNet, this Google Drive link will be deprecated, and all downloads will be redirected to the PhysioNet platform.*
+
+- **Google Drive Link:** [Link Here] *(Password required)*
+
+---
+
+### 🤖 ROSALIA Models
+The pre-trained weights for our **ROSALIA** model are publicly available on Hugging Face. You can download the checkpoints directly from the link below.
+
+| Model | Backbone | Download |
+| :--- | :--- | :--- |
+| **ROSALIA** | LLaVA / SAM-H | [🤗 Hugging Face](https://huggingface.co/[Your_HF_Username]/[Model_Name]) |
 
 ## 🛠️ Setup
 First, create your environment. We recommend using the following commands. 
