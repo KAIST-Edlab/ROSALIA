@@ -1,20 +1,12 @@
-[![Gradio](https://img.shields.io/badge/Gradio-Online%20Demo-blue)](http://103.170.5.190:7860/)
-[![Open in OpenXLab](https://cdn-static.openxlab.org.cn/app-center/openxlab_app.svg)](https://openxlab.org.cn/apps/detail/openxlab-app/LISA)
-
-# LISA: Reasoning Segmentation via Large Language Model
+# Instruction-Guided Lesion Segmentation for Chest X-rays with Automatically Generated Large-Scale Dataset (CVPR 2026 Main)
 
 <font size=7><div align='center'><b>LISA</b>: Large <b>L</b>anguage <b>I</b>nstructed <b>S</b>egmentation <b>A</b>ssistant</div></font>
 
 <font size=7><div align='center'>
-    <a href="https://arxiv.org/pdf/2308.00692.pdf"><strong>Paper</strong></a> | 
-    <a href="https://huggingface.co/xinlai"><strong>Models</strong></a> | 
-    <a href="#training"><strong>Training</strong></a> | 
-    <a href="#inference"><strong>Inference</strong></a> | 
-    <a href="#deployment"><strong>Local Deployment</strong></a> | 
-    <a href="#dataset"><strong>Dataset</strong></a> | 
-    <a href=""><strong>Online Demo</strong></a> | 
-    <a href="https://huggingface.co/collections/Senqiao/lisa-67713837a32d6abf516a162e"><strong>LISA++ Dataset</strong></a> | 
-    <a href="https://huggingface.co/Senqiao/LISA_Plus_7b"><strong>LISA++ Model</strong></a>
+    <a href="https://arxiv.org/abs/2511.15186"><strong>Paper</strong></a> | 
+    <a href="https://huggingface.co/collections/Senqiao/lisa-67713837a32d6abf516a162e"><strong>Dataset</strong></a> | 
+    <a href="https://huggingface.co/xinlai"><strong>Model</strong></a> | 
+    
 </div></font>
 
 <!-- <p align="center"> <img src="imgs/teaser.jpg" width="100%"> </p> -->
