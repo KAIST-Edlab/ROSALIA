@@ -16,8 +16,8 @@
 
 Identifying and segmenting lesions in Chest X-rays (CXR) is crucial for accurate medical diagnosis, but conventional approaches face significant challenges:
 
-1. **Scarcity of dense annotations:** Pixel-level labeling by medical experts is extremely expensive and time-consuming.
-2. **Lack of flexible interaction:** Existing models often perform fixed sets of tasks and cannot adapt to user-provided instructions or complex clinical prompts.
+1. **Lack of flexible interaction:** Existing VLMs often perform segmentation on a single lesion type and cannot adapt to simple user-provided instructions.
+2. **Scarcity of dense annotations:** Developing VLMs with more versatile capabilities requires large-scale datasets, yet pixel-level labeling by medical experts is extremely expensive and time-consuming.
 
 To address these limitations, we introduce an automated pipeline to generate **MIMIC-ILS**, a large-scale, high-quality segmentation dataset for Chest X-rays without manual human annotation. Utilizing this dataset, we train **ROSALIA**, a Vision-Language Model (VLM) tailored for instruction-guided lesion segmentation.
 
