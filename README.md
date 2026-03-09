@@ -59,9 +59,10 @@ cd ROSALIA
 
 conda create -n rosalia python=3.10
 conda activate rosalia
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
 pip install -r requirements.txt
 
-# The above requirements file assumes your environment uses cuda 12.6.
+# This requirements file assumes a CUDA 12.6 environment. Please ensure your setup is compatible or modify the file accordingly.
 ```
 
 ## 📝 Citation
