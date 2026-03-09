@@ -1,5 +1,8 @@
 import argparse
 import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
+os.environ['HF_HOME'] = '/home/data_storage/huggingface'
+MY_HF_TOKEN = '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'
 import shutil
 import sys
 import time
@@ -34,7 +37,7 @@ def parse_args(args):
     parser = argparse.ArgumentParser(description="LISA Model Training")
     parser.add_argument("--local_rank", default=0, type=int, help="node rank")
     parser.add_argument(
-        "--version", default="xinlai/LISA-7B-v1"
+        "--version", default="hangyulmd/rosalia"
     ) # xinlai/LISA-7B-v1, xinlai/LISA-13B-llama2-v1, "liuhaotian/llava-llama-2-13b-chat-lightning-preview"
     parser.add_argument(
         "--precision",
@@ -50,7 +53,7 @@ def parse_args(args):
     )
     parser.add_argument("--load_in_8bit", action="store_true", default=False)
     parser.add_argument("--load_in_4bit", action="store_true", default=False)
-    parser.add_argument("--dataset_dir", default="/home/work/data/hangyul", type=str) ## need to change
+    parser.add_argument("--dataset_dir", default="/home/edlab/gchoi/datasets/rosalia", type=str) ## need to change
     parser.add_argument("--json_dir", default="/home/work/data/hangyul/mimic_cxr_not_filtered_qa/mimic_cxr_merged.json", type=str) ## need to change
     parser.add_argument("--cache_dir", default=None, type=str) ## need to change
     parser.add_argument("--log_base_dir", default="/home/work/data/runs", type=str) ## need to change
@@ -148,7 +151,7 @@ def main(args):
     elif args.precision == "fp16":
         torch_dtype = torch.half
     model = LISAForCausalLM.from_pretrained(
-        args.version, torch_dtype=torch_dtype, low_cpu_mem_usage=False, cache_dir=args.cache_dir, **model_args
+        args.version, torch_dtype=torch_dtype, low_cpu_mem_usage=False, cache_dir=args.cache_dir, token=MY_HF_TOKEN, **model_args
     )
     model.config.eos_token_id = tokenizer.eos_token_id
     model.config.bos_token_id = tokenizer.bos_token_id
@@ -246,6 +249,8 @@ def main(args):
         precision= args.precision,
         split="train"
     )
+
+    #train_dataset = torch.utils.data.Subset(train_dataset, range(100))
 
     if args.no_eval == False:
         val_dataset = ReasonSegDataset(
@@ -563,13 +568,13 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
     metric_list = ['intersection', 'union', 'iou']
     disease_meter_dict = {}
     question_meter_dict = {}
-    non_empty_counter = {}
-    for disease in disease_list: 
-        disease_meter_dict[disease] = {'pos':{}, 'neg': {}}
-        non_empty_counter[disease] = AverageMeter(f"{disease.title()}_non_empty_counter", ":6.3f", Summary.SUM)
-        for metric in metric_list: 
-            disease_meter_dict[disease]['pos'][metric] = AverageMeter(f"{disease.title()}_pos_{metric}", ":6.3f", Summary.SUM)
-            disease_meter_dict[disease]['neg'][metric] = AverageMeter(f"{disease.title()}_neg_{metric}", ":6.3f", Summary.SUM)
+    # non_empty_counter = {}
+    # for disease in disease_list: 
+    #     disease_meter_dict[disease] = {'pos':{}, 'neg': {}}
+    #     non_empty_counter[disease] = AverageMeter(f"{disease.title()}_non_empty_counter", ":6.3f", Summary.SUM)
+    #     for metric in metric_list: 
+    #         disease_meter_dict[disease]['pos'][metric] = AverageMeter(f"{disease.title()}_pos_{metric}", ":6.3f", Summary.SUM)
+    #         disease_meter_dict[disease]['neg'][metric] = AverageMeter(f"{disease.title()}_neg_{metric}", ":6.3f", Summary.SUM)
 
     for question_type in question_type_list:
         question_meter_dict[question_type] = {'pos':AverageMeter(f"{question_type.title()}_pos", ":6.3f", Summary.SUM), 'neg': AverageMeter(f"{question_type.title()}_neg", ":6.3f", Summary.SUM)}
@@ -716,17 +721,17 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
 
         if masks_list[0].sum() != 0:
             intersection_meter_pos.update(intersection), union_meter_pos.update(union), acc_iou_meter_pos.update(acc_iou, n=masks_list.shape[0])
-            disease_meter_dict[disease_category]['pos']['intersection'].update(intersection)
-            disease_meter_dict[disease_category]['pos']['union'].update(union)
-            disease_meter_dict[disease_category]['pos']['iou'].update(acc_iou, n=masks_list.shape[0])
+            # disease_meter_dict[disease_category]['pos']['intersection'].update(intersection)
+            # disease_meter_dict[disease_category]['pos']['union'].update(union)
+            # disease_meter_dict[disease_category]['pos']['iou'].update(acc_iou, n=masks_list.shape[0])
 
-            if output_list[0].sum() != 0: 
-                non_empty_counter[disease_category].update(masks_list.shape[0], n=masks_list.shape[0])
+            # if output_list[0].sum() != 0: 
+            #     non_empty_counter[disease_category].update(masks_list.shape[0], n=masks_list.shape[0])
         else:
             intersection_meter_neg.update(intersection), union_meter_neg.update(union), acc_iou_meter_neg.update(acc_iou, n=masks_list.shape[0])
-            disease_meter_dict[disease_category]['neg']['intersection'].update(intersection)
-            disease_meter_dict[disease_category]['neg']['union'].update(union)
-            disease_meter_dict[disease_category]['neg']['iou'].update(acc_iou, n=masks_list.shape[0])
+            # disease_meter_dict[disease_category]['neg']['intersection'].update(intersection)
+            # disease_meter_dict[disease_category]['neg']['union'].update(union)
+            # disease_meter_dict[disease_category]['neg']['iou'].update(acc_iou, n=masks_list.shape[0])
 
     intersection_meter.all_reduce()
     union_meter.all_reduce()
@@ -738,10 +743,10 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
     union_meter_neg.all_reduce()
     acc_iou_meter_neg.all_reduce()
 
-    for disease in disease_list: 
-        for v_dict in disease_meter_dict[disease]['pos'].values(): v_dict.all_reduce()
-        for v_dict in disease_meter_dict[disease]['neg'].values(): v_dict.all_reduce()
-        non_empty_counter[disease].all_reduce()
+    # for disease in disease_list: 
+    #     for v_dict in disease_meter_dict[disease]['pos'].values(): v_dict.all_reduce()
+    #     for v_dict in disease_meter_dict[disease]['neg'].values(): v_dict.all_reduce()
+    #     non_empty_counter[disease].all_reduce()
     if args.measure_text: 
         for question_type in question_type_list: 
             question_meter_dict[question_type]['pos'].all_reduce()
@@ -772,17 +777,17 @@ def validate(val_loader, model_engine, epoch, writer, args, tokenizer=None):
         writer.add_scalar("val/giou_neg", giou_neg, epoch)
         print("Pos sample (n={}) - giou_pos: {:.4f}, ciou_pos: {:.4f} / Neg sample (n={}) - giou_neg: {:.4f}, ciou_neg: None".format(int(intersection_meter_pos.count), giou_pos, ciou_pos, int(intersection_meter_neg.count), giou_neg))
 
-        for disease in disease_list: 
-            iou_disease_pos = disease_meter_dict[disease]['pos']['intersection'].sum / (disease_meter_dict[disease]['pos']['union'].sum + 1e-10)
-            ciou_disease = iou_disease_pos[1]
-            giou_disease_pos = disease_meter_dict[disease]['pos']['iou'].avg[1]
-            giou_disease_neg = disease_meter_dict[disease]['neg']['iou'].avg[1]
+        # for disease in disease_list: 
+        #     iou_disease_pos = disease_meter_dict[disease]['pos']['intersection'].sum / (disease_meter_dict[disease]['pos']['union'].sum + 1e-10)
+        #     ciou_disease = iou_disease_pos[1]
+        #     giou_disease_pos = disease_meter_dict[disease]['pos']['iou'].avg[1]
+        #     giou_disease_neg = disease_meter_dict[disease]['neg']['iou'].avg[1]
 
-            pos_disease_count = int(disease_meter_dict[disease]['pos']['intersection'].count)
-            neg_disease_count = int(disease_meter_dict[disease]['neg']['intersection'].count)
-            non_empty_count = int(non_empty_counter[disease].count)
+        #     pos_disease_count = int(disease_meter_dict[disease]['pos']['intersection'].count)
+        #     neg_disease_count = int(disease_meter_dict[disease]['neg']['intersection'].count)
+        #     non_empty_count = int(non_empty_counter[disease].count)
 
-            print(f"{disease.title()} (n={pos_disease_count}) - giou_pos: {giou_disease_pos:.4f}, ciou_pos: {ciou_disease:.4f}, false_empty_ratio: {(pos_disease_count-non_empty_count)/(pos_disease_count):.4f} ({pos_disease_count-non_empty_count}/{pos_disease_count}) / No {disease.title()} (n={neg_disease_count}) - giou_neg: {giou_disease_neg:.4f}, ciou_neg: None")
+        #     print(f"{disease.title()} (n={pos_disease_count}) - giou_pos: {giou_disease_pos:.4f}, ciou_pos: {ciou_disease:.4f}, false_empty_ratio: {(pos_disease_count-non_empty_count)/(pos_disease_count):.4f} ({pos_disease_count-non_empty_count}/{pos_disease_count}) / No {disease.title()} (n={neg_disease_count}) - giou_neg: {giou_disease_neg:.4f}, ciou_neg: None")
 
         if args.measure_text: 
             total_count, total_correct_count = 0, 0
