@@ -41,8 +41,6 @@ In the meantime, we are providing temporary access via a password-protected Goog
 
 - [Google Drive Link](https://drive.google.com/file/d/15ffBB3hLXwferIJinfM5raJYhugIkPxn/view?usp=sharing) *(Password required)*
 
----
-
 ## 🤖 Model
 The pre-trained weights for our **ROSALIA** model are publicly available on Hugging Face. You can download the checkpoints directly from the link below.
 
