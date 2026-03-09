@@ -2,7 +2,7 @@
 
 This repository is the official implementation of [Instruction-Guided Lesion Segmentation for Chest X-rays with Automatically Generated Large-Scale Dataset](https://arxiv.org/abs/2511.15186), led by
 
-[Geon Choi](https://checkoneee.github.io/), [Hangyul Yoon], [Hyunju Shi], [Hyunki Park], [Sang Hoon Seo], [Eunho Yang](https://mli.kaist.ac.kr/), [Edward Choi](https://mp2893.com/index.html)
+[Geon Choi](https://checkoneee.github.io/), Hangyul Yoon, Hyunju Shin, Hyunki Park, Sang Hoon Seo, [Eunho Yang](https://mli.kaist.ac.kr/), [Edward Choi](https://mp2893.com/index.html)
 
 ![main figure](assets/teaser.jpg)
 
