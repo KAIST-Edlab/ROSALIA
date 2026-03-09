@@ -1,27 +1,31 @@
 import os
+import sys
+import cv2
+import torch
+import torch.nn.functional as F
+import transformers
+from torchvision.utils import save_image
 
+# Set Hugging Face home and cache directories to large storage
 os.environ['HF_HOME'] = '/home/data_storage/huggingface'
 os.environ['HF_HUB_CACHE'] = '/home/data_storage/huggingface/hub'
 
-import sys
-
-import torch
-import torch.nn.functional as F 
-import transformers
-
+# Core architecture based on LISA (Reasoning Segmentation via LLM)
 from model.LISA import LISAForCausalLM
 from model.llava import conversation as conversation_lib
 from model.llava.mm_utils import tokenizer_image_token
 
-# from utils.dataset import CXRSegDataset, ValDataset, collate_fn
-from utils.utils import (DEFAULT_IM_END_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IMAGE_TOKEN, IMAGE_TOKEN_INDEX)
-
-from torchvision.utils import save_image
-import cv2
-import os 
-
-from transformers import CLIPImageProcessor
+# Vision and Segmentation modules
 from model.segment_anything.utils.transforms import ResizeLongestSide
+from transformers import CLIPImageProcessor
+
+# Project utilities
+from utils.utils import (
+    DEFAULT_IM_END_TOKEN, 
+    DEFAULT_IM_START_TOKEN, 
+    DEFAULT_IMAGE_TOKEN, 
+    IMAGE_TOKEN_INDEX
+)
 
 def preprocess(
     x,
