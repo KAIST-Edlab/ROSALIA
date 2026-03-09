@@ -27,9 +27,8 @@ By interpreting simple, user-friendly instructions instead of relying on complex
 - [Feb 2026] 🎉 Our paper has been accepted to **CVPR 2026**!
 - [Nov 2025] 📜 Preprint is available on [arXiv](https://arxiv.org/abs/2511.15186).
 
-## 📥 Dataset and Models
+## 💾 Dataset
 
-### 📊 MIMIC-ILS Dataset
 Our **MIMIC-ILS dataset** is currently under submission to [PhysioNet](https://physionet.org/). 
 
 In the meantime, we are providing temporary access via a password-protected Google Drive link. Since our dataset is derived from MIMIC-CXR, users must meet the same credentialing requirements. To obtain the password, please follow these steps:
@@ -44,7 +43,7 @@ In the meantime, we are providing temporary access via a password-protected Goog
 
 ---
 
-### 🤖 ROSALIA Models
+## 🤖 Model
 The pre-trained weights for our **ROSALIA** model are publicly available on Hugging Face. You can download the checkpoints directly from the link below.
 
 | Model | Backbone | Download |
