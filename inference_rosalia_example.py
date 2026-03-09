@@ -1,13 +1,14 @@
 import os
+
+# Set Hugging Face home and cache directories to large storage
+os.environ['HF_HOME'] = '/home/data_storage/huggingface'
+os.environ['HF_HUB_CACHE'] = '/home/data_storage/huggingface/hub'
+
 import cv2
 import torch
 import torch.nn.functional as F
 import transformers
 from torchvision.utils import save_image
-
-# Set Hugging Face home and cache directories to large storage
-os.environ['HF_HOME'] = '/home/data_storage/huggingface'
-os.environ['HF_HUB_CACHE'] = '/home/data_storage/huggingface/hub'
 
 # Core architecture based on LISA (Reasoning Segmentation via LLM)
 from model.LISA import LISAForCausalLM
