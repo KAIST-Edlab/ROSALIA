@@ -31,7 +31,7 @@ By interpreting simple, user-friendly instructions instead of relying on complex
 
 ## 💾 Dataset
 
-Our dataset **MIMIC-ILS** is officially published on [PhysioNet](https://physionet.org/content/mimic-cxr-ext-ils/1.0.0/).
+Our dataset **MIMIC-ILS** (MIMIC-CXR-Ext-ILS) is officially published on [PhysioNet](https://physionet.org/content/mimic-cxr-ext-ils/1.0.0/).
 
 Since our dataset is derived from MIMIC-CXR, users must meet the same credentialing requirements to access the files:
 
