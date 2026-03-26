@@ -39,8 +39,6 @@ Since our dataset is derived from MIMIC-CXR, users must meet the same credential
 2. Complete the required **CITI Data or Specimens Only Research** training.
 3. Sign the Data Use Agreement (DUA) for the project.
 
-- [PhysioNet Dataset Page](https://physionet.org/content/mimic-cxr-ext-ils/1.0.0/) (DOI: [10.13026/8ejy-4t06](https://doi.org/10.13026/8ejy-4t06))
-
 ## 🤖 Model
 The pre-trained weights for our **ROSALIA** model are publicly available on Hugging Face. You can download the checkpoints directly from the link below.
 
