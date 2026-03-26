@@ -3,7 +3,7 @@
 # Instruction-Guided Lesion Segmentation for Chest X-rays with Automatically Generated Large-Scale Dataset<br>(CVPR 2026 Main)
 
 [![arXiv](https://img.shields.io/badge/arXiv-2511.15186-b31b1b.svg)](https://arxiv.org/abs/2511.15186)
-[![PhysioNet](https://img.shields.io/badge/PhysioNet-MIMIC-ILS-blue.svg)](https://physionet.org/content/mimic-cxr-ext-ils/1.0.0/)
+[![PhysioNet](https://img.shields.io/badge/PhysioNet-MIMIC--CXR--Ext--ILS-blue.svg)](https://physionet.org/content/mimic-cxr-ext-ils/1.0.0/)
 
 [Geon Choi*](https://checkoneee.github.io/), [Hangyul Yoon*](https://www.linkedin.com/in/hangyul-yoon-a10838203/), Hyunju Shin, Hyunki Park, Sang Hoon Seo, [Eunho Yang](https://mli.kaist.ac.kr/), [Edward Choi](https://mp2893.com/index.html)<br>
 (*: Equal Contribution)
