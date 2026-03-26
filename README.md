@@ -3,7 +3,7 @@
 # Instruction-Guided Lesion Segmentation for Chest X-rays with Automatically Generated Large-Scale Dataset<br>(CVPR 2026 Main)
 
 [![arXiv](https://img.shields.io/badge/arXiv-2511.15186-b31b1b.svg)](https://arxiv.org/abs/2511.15186)
-[![PhysioNet](https://img.shields.io/badge/PhysioNet-MIMIC--CXR--Ext--ILS-blue.svg)](https://physionet.org/content/mimic-cxr-ext-ils/1.0.0/)
+[![PhysioNet](https://img.shields.io/badge/PhysioNet-MIMIC-ILS-blue.svg)](https://physionet.org/content/mimic-cxr-ext-ils/1.0.0/)
 
 [Geon Choi*](https://checkoneee.github.io/), [Hangyul Yoon*](https://www.linkedin.com/in/hangyul-yoon-a10838203/), Hyunju Shin, Hyunki Park, Sang Hoon Seo, [Eunho Yang](https://mli.kaist.ac.kr/), [Edward Choi](https://mp2893.com/index.html)<br>
 (*: Equal Contribution)
@@ -25,13 +25,13 @@ To address these limitations, we introduce an automated pipeline to generate **M
 By interpreting simple, user-friendly instructions instead of relying on complex expert-level prompts, our model can accurately segment diverse thoracic lesions and provide textual explanations, offering a highly accessible and practical approach to medical image analysis.
 
 ## 🗓 ️News
-- [Mar 2026] 🗄️ Our dataset **MIMIC-CXR-Ext-ILS** is now officially available on [PhysioNet](https://physionet.org/content/mimic-cxr-ext-ils/1.0.0/)!
+- [Mar 2026] 🗄️ Our dataset **MIMIC-ILS** is now officially available on [PhysioNet](https://physionet.org/content/mimic-cxr-ext-ils/1.0.0/)!
 - [Feb 2026] 🎉 Our paper has been accepted to **CVPR 2026**!
 - [Nov 2025] 📜 Preprint is available on [arXiv](https://arxiv.org/abs/2511.15186).
 
 ## 💾 Dataset
 
-Our dataset **MIMIC-CXR-Ext-ILS** is officially published on [PhysioNet](https://physionet.org/content/mimic-cxr-ext-ils/1.0.0/).
+Our dataset **MIMIC-ILS** is officially published on [PhysioNet](https://physionet.org/content/mimic-cxr-ext-ils/1.0.0/).
 
 Since our dataset is derived from MIMIC-CXR, users must meet the same credentialing requirements to access the files:
 
