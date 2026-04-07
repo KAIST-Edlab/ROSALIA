@@ -31,6 +31,7 @@ class ReasonSegDataset(torch.utils.data.Dataset):
         args,
         json_dir,
         base_image_dir,
+        base_mask_dir,
         tokenizer,
         vision_tower,
         precision: str = "fp32",
@@ -43,6 +44,7 @@ class ReasonSegDataset(torch.utils.data.Dataset):
 
         with open(json_dir, 'r') as f: self.json_file = json.load(f)[split]
         self.base_image_dir = base_image_dir
+        self.base_mask_dir = base_mask_dir
         self.image_size = image_size
         self.tokenizer = tokenizer
         self.precision = precision
@@ -59,58 +61,33 @@ class ReasonSegDataset(torch.utils.data.Dataset):
         if args.local_rank == 0: print(f'start processing {split} dataset...')
         item_object = tqdm(self.json_file.items()) if args.local_rank == 0 else self.json_file.items()
         for sample_key, item in item_object:
-            id = item['dicom_id']
-            section_qa = item['section_qa']
-            for qa_type, qa_list in section_qa.items():
-                if isinstance(qa_list, dict):
-                    # e.g., grounded_major_lesion: dict of lists
-                    for lesion_key, lesion_qa_list in qa_list.items():
-                        if not isinstance(lesion_qa_list, list):
-                            continue
-                        for qa_item in lesion_qa_list:
-                            if not isinstance(qa_item, dict):
-                                continue
-                            for i in range(len(qa_item['question'])):
-                                if qa_item['target'].lower() == 'congestion': continue
-                                if args.pos_only and qa_item['seg'] is False: continue
-                                if args.neg_only and qa_item['seg'] is True: continue
-                                sample_dict = {}
-                                sample_dict['question'] = qa_item['question'][i]
-                                sample_dict['answer'] = qa_item['answer'][i]
-                                sample_dict['disease'] = qa_item['target']
-                                sample_dict['image_path'] = os.path.join(self.base_image_dir, 'mimic-cxr-dcm-png-histeq', f'{id}.png')
-                                if qa_item['seg'] is False:
-                                    sample_dict['mask_path'] = None
-                                else:
-                                    sample_dict['mask_path'] = os.path.join(self.base_image_dir, 'seg_mask', qa_item['seg_mask_path'])
+            pos_qa = item['instruction_answer_pairs']['positive_pairs']
+            neg_qa = item['instruction_answer_pairs']['negative_pairs']
+            image_path = os.path.join(self.base_image_dir, item['image_path'])
 
-                                if self.batch_balance: 
-                                    if qa_item['seg'] is True: self.pos_dataset.append(sample_dict)
-                                    else: self.neg_dataset.append(sample_dict)
-                                else:
-                                    self.dataset.append(sample_dict)
+            if args.neg_only is False: 
+                for qa_item in pos_qa:
+                    sample_dict = {}
+                    sample_dict['question'] = qa_item['instruction']
+                    sample_dict['answer'] = qa_item['answer']
+                    sample_dict['disease'] = qa_item['target']
+                    sample_dict['image_path'] = image_path
+                    sample_dict['mask_path'] = os.path.join(self.base_mask_dir, qa_item['seg_mask_path'])
+                    
+                    if self.batch_balance: self.pos_dataset.append(sample_dict)
+                    else: self.dataset.append(sample_dict)
 
-                elif isinstance(qa_list, list):
-                    for qa_item in qa_list:
-                        for i in range(len(qa_item['question'])):
-                            if qa_item['target'].lower() == 'congestion': continue
-                            if args.pos_only and qa_item['seg'] is False: continue
-                            if args.neg_only and qa_item['seg'] is True: continue
-                            sample_dict = {}
-                            sample_dict['question'] = qa_item['question'][i]
-                            sample_dict['answer'] = qa_item['answer'][i]
-                            sample_dict['disease'] = qa_item['target']
-                            sample_dict['image_path'] = os.path.join(self.base_image_dir, 'mimic-cxr-dcm-png-histeq', f'{id}.png')
-                            if qa_item['seg'] is False:
-                                sample_dict['mask_path'] = None
-                            else:
-                                sample_dict['mask_path'] = os.path.join(self.base_image_dir, 'seg_mask', qa_item['seg_mask_path'])
+            if args.pos_only is False:
+                for qa_item in neg_qa:
+                    sample_dict = {}
+                    sample_dict['question'] = qa_item['instruction']
+                    sample_dict['answer'] = qa_item['answer']
+                    sample_dict['disease'] = qa_item['target']
+                    sample_dict['image_path'] = image_path
+                    sample_dict['mask_path'] = None
 
-                            if self.batch_balance: 
-                                if qa_item['seg'] is True: self.pos_dataset.append(sample_dict)
-                                else: self.neg_dataset.append(sample_dict)
-                            else:
-                                self.dataset.append(sample_dict)
+                    if self.batch_balance: self.neg_dataset.append(sample_dict)
+                    else: self.dataset.append(sample_dict)
 
         if args.debug: 
             self.dataset = self.dataset[:50000] if self.split == 'train' else self.dataset[:1000]
@@ -157,9 +134,6 @@ class ReasonSegDataset(torch.utils.data.Dataset):
         else:
             sample = self.dataset[idx]
         image_path = sample['image_path']
-        if self.split == 'train':
-            if random.random() < 0.5: 
-                image_path = image_path.replace('/mimic-cxr-dcm-png-histeq/', '/mimic-cxr-dcm-png/')
         disease = sample['disease']
 
         image = cv2.imread(image_path)

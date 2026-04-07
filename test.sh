@@ -1,9 +1,13 @@
-CUDA_VISIBLE_DEVICES=0,1 deepspeed --master_port=24999 train_ds.py \
---version /home/edlab/gchoi/projects/2025_rosalia/ROSALIA/saved_model/weight_lisa_13b_sam_finetune_test \
---json_dir /home/edlab/gchoi/projects/2025_rosalia/ROSALIA/mimic_cxr_merged.json \
---cache_dir /home/data_storage/huggingface \
+deepspeed --master_port=24999 train_ds.py \
 --test \
+--version checkone/ROSALIA-7B-v1 \
+--log_base_dir /home/work/data/runs \
+--cache_dir /home/work/data \
+--base_image_dir /home/work/data/cxr_datasets/MIMIC-CXR/mimic-cxr-jpg/2.1.0/files \
+--base_mask_dir /home/work/data/mimic-cxr-ext-ils/1.0.0/lesion_mask \
+--json_dir /home/work/data/mimic-cxr-ext-ils/1.0.0/mimic_ils_instruction_answer.json \
+--batch_size 1 \
 --lora_r 4 \
---exp_name lisa_13b_sam_finetune_test \
---vision_pretrained /home/edlab/gchoi/projects/2025_rosalia/ROSALIA/sam_vit_h_4b8939.pth \
---log_base_dir /home/edlab/gchoi/projects/2025_rosalia/ROSALIA/runs
+--exp_name test \
+--vision_pretrained /home/work/data/sam_vit_h_4b8939.pth \
+--debug
