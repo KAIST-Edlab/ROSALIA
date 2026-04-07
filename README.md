@@ -61,6 +61,26 @@ pip install -r requirements.txt
 # This requirements file assumes a CUDA 12.6 environment. Please ensure your setup is compatible or modify the file accordingly.
 ```
 
+## 🛠️ Model Training
+You can train the model using the `train.sh` script. Please modify the script arguments to match your directories and environment.
+
+```
+sh.train.sh
+```
+
+## 🛠️ Weight Merging and Testing 
+Merge the LoRA weights from `pytorch_model.bin` and save the resulting model to your desired path in Hugging Face format:
+
+```
+sh merge_weight.sh
+```
+
+After that, you can evaluate the merged model on the test set:
+
+```
+sh test.sh
+```
+
 ## 📝 Citation
 If you find our work useful, please cite as below or leave a star to this repository.
 
