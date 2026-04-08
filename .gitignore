@@ -4,3 +4,4 @@ runs/
 *.bin
 *.pth
 **/saved_model/
+mimic_cxr_merged.json
