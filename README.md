@@ -61,14 +61,18 @@ pip install -r requirements.txt
 # This requirements file assumes a CUDA 12.6 environment. Please ensure your setup is compatible or modify the file accordingly.
 ```
 
-## 🛠️ Model Training
+## 💡 Inference Example
+You can test the inference using the `inference_rosalia_example.py` script.
+
+
+## ⚙️ Model Training
 You can train the model using the `train.sh` script. Please modify the script arguments to match your directories and environment.
 
 ```
-sh.train.sh
+sh train.sh
 ```
 
-## 🛠️ Weight Merging and Testing 
+## 🔗 Weight Merging and Testing 
 Merge the LoRA weights from `pytorch_model.bin` and save the resulting model to your desired path in Hugging Face format:
 
 ```
