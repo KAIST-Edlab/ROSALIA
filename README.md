@@ -44,7 +44,7 @@ The pre-trained weights for our **ROSALIA** model are publicly available on Hugg
 
 | Model | Backbone | Download |
 | :--- | :--- | :--- |
-| **ROSALIA** | LISA | [🤗 Hugging Face](https://huggingface.co/[Your_HF_Username]/[Model_Name]) |
+| **ROSALIA** | LISA | [🤗 Hugging Face](https://huggingface.co/checkone/ROSALIA-7B-v1) |
 
 ## 🛠️ Setup
 First, create your environment. We recommend using the following commands. 
