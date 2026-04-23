@@ -39,6 +39,8 @@ Since our dataset is derived from MIMIC-CXR, users must meet the same credential
 2. Complete the required **CITI Data or Specimens Only Research** training.
 3. Sign the Data Use Agreement (DUA) for the project.
 
+> **💡 Download Tip:** We recommend using the **AWS CLI** command provided at the bottom of the PhysioNet project page to download the dataset. Downloading via `wget` can be very slow and prone to hanging due to the large number of files, as `wget` attempts to create all directory folders before downloading the actual image files. The AWS CLI offers significantly faster and more reliable downloads.
+
 ## 🤖 Model
 The pre-trained weights for our **ROSALIA** model are publicly available on Hugging Face. You can download the checkpoints directly from the link below.
 
